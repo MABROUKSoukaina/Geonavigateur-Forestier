@@ -235,7 +235,7 @@ export function MultiPointPanel() {
               background: routeSource === 'osrm' ? 'rgba(0,200,100,0.15)' : routeSource === 'offline-graph' ? 'rgba(66,133,244,0.15)' : 'rgba(255,165,0,0.15)',
               color: routeSource === 'osrm' ? '#00c864' : routeSource === 'offline-graph' ? '#4285f4' : '#f59e0b'
             }}>
-              {routeSource === 'osrm' ? '🛣️ Trajet routier OSRM' : routeSource === 'offline-graph' ? '🗺️ Réseau local (Dijkstra)' : '📏 Estimation hors-ligne'}
+              {routeSource === 'osrm' ? '🛣️ Trajet routier OSRM' : routeSource === 'offline-graph' ? '🗺️ Réseau local' : '📏 Estimation hors-ligne'}
             </div>
           )}
 

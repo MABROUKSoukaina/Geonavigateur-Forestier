@@ -72,7 +72,7 @@ function PointCard({ title, iconClass, iconSvg, type, setType, selectedCode, onS
 
 const SOURCE_LABELS: Record<string, { label: string; color: string; icon: string }> = {
   'osrm': { label: 'Trajet routier OSRM', color: '#00c864', icon: '🛣️' },
-  'offline-graph': { label: 'Réseau local (Dijkstra)', color: '#4285f4', icon: '🗺️' },
+  'offline-graph': { label: 'Réseau local', color: '#4285f4', icon: '🗺️' },
   'offline-fallback': { label: 'Estimation hors-ligne', color: '#f59e0b', icon: '📏' },
   'vol': { label: "Vol d'oiseau", color: '#00d4aa', icon: '🧭' },
 };

@@ -21,18 +21,13 @@ function fileToWorkbook(file: File): Promise<XLSX.WorkBook> {
           const text = e.target?.result as string;
           const firstLine = text.split('\n')[0];
           const delim = detectDelimiter(firstLine);
-          // Normalise semicolon-delimited to comma before passing to XLSX
-          const normalised = delim === ';'
-            ? text.split('\n').map(line => line.split(';').map(cell => {
-                const trimmed = cell.trim();
-                return trimmed.includes(',') ? `"${trimmed}"` : trimmed;
-              }).join(',')).join('\n')
-            : text;
-          const wb = XLSX.read(normalised, { type: 'string' });
+          // Pass delimiter directly to XLSX — cell values with commas (e.g. French decimals
+          // like "33,4948559") are left as raw strings and handled later by toNum/toCoord
+          const wb = XLSX.read(text, { type: 'string', FS: delim });
           resolve(wb);
         } catch (err) { reject(err); }
       };
-      reader.readAsText(file); // UTF-8; for Latin-1 files user should resave as UTF-8
+      reader.readAsText(file);
     } else {
       reader.onload = (e) => {
         try {
@@ -46,6 +41,25 @@ function fileToWorkbook(file: File): Promise<XLSX.WorkBook> {
 
 // Parse numeric value — handles both '.' and ',' as decimal separator
 const toNum = (v: unknown): number => Number(String(v ?? '').replace(',', '.'));
+
+// Scale integer-encoded coordinates independently.
+// lat: assumes 2 integer digits (covers all inhabited latitudes 10–89°).
+// lng: tries 1 integer digit first, then 2, then 3 — handles mixed precision where
+//      some lng values use a different exponent than lat (e.g. repère coords in CSV).
+function scaleLat(n: number): number {
+  if (isNaN(n) || Math.abs(n) <= 90) return n;
+  const digits = Math.floor(Math.log10(Math.abs(n))) + 1;
+  return n / Math.pow(10, digits - 2);
+}
+function scaleLng(n: number): number {
+  if (isNaN(n) || Math.abs(n) <= 180) return n;
+  const digits = Math.floor(Math.log10(Math.abs(n))) + 1;
+  for (let intDig = 1; intDig <= 3; intDig++) {
+    const result = n / Math.pow(10, digits - intDig);
+    if (Math.abs(result) <= 180) return result;
+  }
+  return n;
+}
 
 export function getExcelColumns(file: File): Promise<string[]> {
   return fileToWorkbook(file).then((wb) => {
@@ -76,12 +90,12 @@ export function parseExcelFile(file: File, mapping: ColumnMapping): Promise<Plac
         const p: Placette = {
           id: `custom-${i}`,
           code: String(row[mapping.code]),
-          lat: toNum(row[mapping.y]),
-          lng: toNum(row[mapping.x]),
+          lat: scaleLat(toNum(row[mapping.y])),
+          lng: scaleLng(toNum(row[mapping.x])),
         };
 
         if (mapping.xRepere && mapping.yRepere && row[mapping.xRepere] && row[mapping.yRepere]) {
-          p.repere = { lat: toNum(row[mapping.yRepere]), lng: toNum(row[mapping.xRepere]) };
+          p.repere = { lat: scaleLat(toNum(row[mapping.yRepere])), lng: scaleLng(toNum(row[mapping.xRepere])) };
         }
         if (mapping.pente && row[mapping.pente]) p.pente = toNum(row[mapping.pente]);
         if (mapping.azimut && row[mapping.azimut]) p.azimut = toNum(row[mapping.azimut]);

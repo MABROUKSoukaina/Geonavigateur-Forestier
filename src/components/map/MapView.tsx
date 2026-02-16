@@ -13,21 +13,24 @@ import type { NavPoint, Placette, BasemapType } from '../../types';
 const icons = {
   placette: L.divIcon({
     className: 'custom-marker',
-    html: `<div style="width:28px;height:28px;background:linear-gradient(135deg,#00d4aa,#00ffcc);border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">
+    html: `<div style="width:28px;height:28px;background:linear-gradient(135deg,#58f572,#3ed957);border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
     </div>`,
     iconSize: [28, 28], iconAnchor: [14, 14], popupAnchor: [0, -14],
   }),
   repere: L.divIcon({
     className: 'custom-marker',
-    html: `<div style="width:24px;height:24px;background:linear-gradient(135deg,#ffd93d,#ffec8b);border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="#333" stroke="#333" stroke-width="2"><circle cx="12" cy="12" r="3"/></svg>
-    </div>`,
-    iconSize: [24, 24], iconAnchor: [12, 12], popupAnchor: [0, -12],
+    html: `<svg width="20" height="28" viewBox="0 0 20 28" xmlns="http://www.w3.org/2000/svg" style="filter:drop-shadow(0 2px 4px rgba(0,0,0,0.4))">
+      <!-- stake -->
+      <line x1="5" y1="4" x2="5" y2="28" stroke="#1a1a1a" stroke-width="2.5" stroke-linecap="round"/>
+      <!-- flag -->
+      <polygon points="5,4 18,8 5,14" fill="#ffd93d" stroke="#c9a800" stroke-width="1"/>
+    </svg>`,
+    iconSize: [20, 28], iconAnchor: [5, 28], popupAnchor: [7, -28],
   }),
   selected: L.divIcon({
     className: 'custom-marker',
-    html: `<div style="width:28px;height:28px;background:linear-gradient(135deg,#ff00ff,#ff66ff);border:3px solid white;border-radius:50%;box-shadow:0 0 12px rgba(255,0,255,0.6),0 2px 8px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">
+    html: `<div style="width:28px;height:28px;background:linear-gradient(135deg,#05fff4,#00e0d8);border:3px solid white;border-radius:50%;box-shadow:0 0 12px rgba(5,255,244,0.7),0 2px 8px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
     </div>`,
     iconSize: [28, 28], iconAnchor: [14, 14], popupAnchor: [0, -14],
@@ -226,16 +229,17 @@ function MapLegend({ customLayers }: { customLayers: { id: string; name: string;
         <div className="map-legend-content">
           <div className="map-legend-title">Légende</div>
           <div className={`map-legend-item toggleable ${showPlacettes ? '' : 'hidden-layer'}`} onClick={togglePlacettes}>
-            <div style={{ width: 20, height: 20, borderRadius: '50%', background: 'linear-gradient(135deg,#00d4aa,#00ffcc)', border: '2px solid white', boxShadow: '0 1px 4px rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <div style={{ width: 20, height: 20, borderRadius: '50%', background: 'linear-gradient(135deg,#58f572,#3ed957)', border: '2px solid white', boxShadow: '0 1px 4px rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <svg width="10" height="10" viewBox="0 0 24 24" fill="white"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
             </div>
             <span>Placettes</span>
             <span className="legend-eye">{showPlacettes ? <EyeOpen /> : <EyeClosed />}</span>
           </div>
           <div className={`map-legend-item toggleable ${showReperes ? '' : 'hidden-layer'}`} onClick={toggleReperes}>
-            <div style={{ width: 18, height: 18, borderRadius: '50%', background: 'linear-gradient(135deg,#ffd93d,#ffec8b)', border: '2px solid white', boxShadow: '0 1px 4px rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <svg width="8" height="8" viewBox="0 0 24 24" fill="#333" stroke="#333" strokeWidth="2"><circle cx="12" cy="12" r="3"/></svg>
-            </div>
+            <svg width="14" height="20" viewBox="0 0 20 28" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
+              <line x1="5" y1="4" x2="5" y2="28" stroke="#1a1a1a" strokeWidth="2.5" strokeLinecap="round"/>
+              <polygon points="5,4 18,8 5,14" fill="#ffd93d" stroke="#c9a800" strokeWidth="1"/>
+            </svg>
             <span>Repères</span>
             <span className="legend-eye">{showReperes ? <EyeOpen /> : <EyeClosed />}</span>
           </div>
@@ -272,7 +276,6 @@ function MapLegend({ customLayers }: { customLayers: { id: string; name: string;
 const BASEMAP_OPTIONS: { value: BasemapType; label: string }[] = [
   { value: 'google-hybrid', label: 'Google Hybrid' },
   { value: 'google-sat', label: 'Google Satellite' },
-  { value: 'google-sat-nolabel', label: 'Satellite (sans label)' },
   { value: 'cartodb-dark', label: 'Dark Mode' },
   { value: 'osm', label: 'OpenStreetMap' },
   { value: 'topo', label: 'Topographie' },

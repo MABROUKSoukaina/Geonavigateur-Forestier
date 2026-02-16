@@ -15,7 +15,7 @@
   --border: rgba(0, 212, 170, 0.2);
   --danger: #ff6b6b;
   --warning: #ffd93d;
-  --placette: #00d4aa;
+  --placette: #58f572;
   --repere: #ffd93d;
 }
 
@@ -696,8 +696,8 @@ body {
   background: rgba(0, 212, 170, 0.05);
 }
 .placette-item.selected {
-  background: rgba(0, 212, 170, 0.1);
-  border-left: 3px solid var(--accent);
+  background: rgba(5, 255, 244, 0.12);
+  border-left: 3px solid #05fff4;
 }
 
 .placette-dot {
@@ -709,7 +709,7 @@ body {
 }
 
 .placette-item.selected .placette-dot {
-  background: #3b82f6;
+  background: #05fff4;
 }
 
 .placette-code {
@@ -1715,12 +1715,12 @@ body {
 }
 
 .popup-btn.select-btn {
-  background: rgba(255, 0, 255, 0.2);
-  border-color: #ff00ff;
-  color: #ff00ff;
+  background: rgba(5, 255, 244, 0.2);
+  border-color: #05fff4;
+  color: #05fff4;
 }
 .popup-btn.select-btn:hover {
-  background: #ff00ff;
+  background: #05fff4;
   color: white;
 }
 

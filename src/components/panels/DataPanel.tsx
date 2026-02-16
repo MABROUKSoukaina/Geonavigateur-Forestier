@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { useDataStore } from '../../stores/useDataStore';
 import { useMapStore } from '../../stores/useMapStore';
+import { useNavigationStore } from '../../stores/useNavigationStore';
 import { getExcelPreview, parseExcelFile, autoDetectMapping } from '../../services/excelParser';
 import { DEFAULT_PLACETTES } from '../../services/defaultData';
 import type { ColumnMapping } from '../../types';
@@ -78,6 +79,8 @@ export function DataPanel() {
         setParseError('Aucune ligne valide trouvée. Vérifiez que les colonnes X, Y et CODE sont correctement mappées.');
         return;
       }
+      // Clear navigation state so ALL new placettes are visible (not filtered by old route)
+      useNavigationStore.getState().clearAll();
       setPlacettes(data);
       setDataSource('custom');
       setImportSuccess(data.length);
@@ -87,7 +90,6 @@ export function DataPanel() {
       const avgLng = data.reduce((s, p) => s + p.lng, 0) / data.length;
       useMapStore.getState().setCenter([avgLat, avgLng]);
       useMapStore.getState().setZoom(10);
-      // Also fit bounds if available
       setTimeout(() => (window as any).__geonav_fitToPlacettes?.(), 300);
     } catch (err) {
       setParseError(`Erreur d'import : ${err instanceof Error ? err.message : String(err)}`);
@@ -97,6 +99,7 @@ export function DataPanel() {
   };
 
   const restoreDefaults = () => {
+    useNavigationStore.getState().clearAll();
     setPlacettes(DEFAULT_PLACETTES);
     setDataSource('default');
     setFile(null);
