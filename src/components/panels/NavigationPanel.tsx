@@ -151,11 +151,6 @@ export function NavigationPanel() {
 
   return (
     <div>
-      {/* Offline status */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', padding: '8px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: '600', background: offlineReady ? 'rgba(66,133,244,0.12)' : 'rgba(255,165,0,0.12)', color: offlineReady ? '#4285f4' : '#f59e0b' }}>
-        {offlineReady ? '🗺️ Réseau local actif' : '⚠️ Réseau local non chargé'}
-        <span style={{ marginLeft: 'auto', fontWeight: '400', opacity: 0.7 }}>Mode: {routingMode === 'online' ? 'Online' : 'Offline'}</span>
-      </div>
 
       <div className="sub-tabs">
         <button className={`sub-tab ${nav.navSubTab === 'simple' ? 'active' : ''}`} onClick={() => nav.setNavSubTab('simple')}>
@@ -181,20 +176,22 @@ export function NavigationPanel() {
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14m-7-7l7 7 7-7"/></svg>
           </div>
 
-          <PointCard title="Arrivée" iconClass="end"
-            iconSvg={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>}
-            type={endType} setType={setEndType} selectedCode={endCode}
-            onSelectPlacette={(c: string) => handleSelectPlacette(c, false)}
-            placetteItems={placetteItems} repereItems={repereItems}
-            onGps={() => handleGps(false)} onCarte={() => setClickMode('setEnd')} point={nav.endPoint} />
+          <div id="nav-end-card">
+            <PointCard title="Arrivée" iconClass="end"
+              iconSvg={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>}
+              type={endType} setType={setEndType} selectedCode={endCode}
+              onSelectPlacette={(c: string) => handleSelectPlacette(c, false)}
+              placetteItems={placetteItems} repereItems={repereItems}
+              onGps={() => handleGps(false)} onCarte={() => setClickMode('setEnd')} point={nav.endPoint} />
+          </div>
 
           {/* Transport */}
           <div style={{ margin: '16px 0' }}>
             <div className="transport-modes-compact" style={{ justifyContent: 'center', gap: '12px' }}>
               {([
-                { mode: 'car' as TransportMode, label: 'Voiture', icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 17h14v-5l-2-6H7l-2 6v5z"/><circle cx="7.5" cy="17.5" r="1.5"/><circle cx="16.5" cy="17.5" r="1.5"/></svg> },
+                { mode: 'car' as TransportMode, label: 'Voiture', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 11l2-5h10l2 5H5z"/><rect x="3" y="11" width="18" height="6" rx="1"/><circle cx="7.5" cy="17.5" r="1.5"/><circle cx="16.5" cy="17.5" r="1.5"/></svg> },
                 { mode: 'walk' as TransportMode, label: 'À pied', icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="5" r="2"/><path d="M10 22l2-7 3 3v6m-3-9l-3-3 1-3 3 3"/></svg> },
-                { mode: 'fly' as TransportMode, label: "Vol d'oiseau", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg> },
+                { mode: 'fly' as TransportMode, label: "Vol d'oiseau", icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="5" cy="19" r="1.5"/><circle cx="19" cy="5" r="1.5"/><line x1="6" y1="18" x2="18" y2="6"/><path d="M9 6h6M18 9v6" strokeDasharray="2 2"/></svg> },
               ]).map(({ mode, label, icon }) => (
                 <div key={mode} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
                   <button className={`transport-btn ${nav.transportMode === mode ? 'active' : ''}`} onClick={() => nav.setTransportMode(mode)} title={label}>{icon}</button>

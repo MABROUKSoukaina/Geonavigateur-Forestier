@@ -72,12 +72,12 @@ function buildPlacettePopup(p: Placette): string {
         </div>
       </div>
       <div class="popup-grid">
-        <div class="popup-item"><div class="popup-item-label">Longitude</div><div class="popup-item-value">${p.lng.toFixed(6)}</div></div>
-        <div class="popup-item"><div class="popup-item-label">Latitude</div><div class="popup-item-value">${p.lat.toFixed(6)}</div></div>
+        <div class="popup-item"><div class="popup-item-label">X Placette</div><div class="popup-item-value">${p.lng.toFixed(6)}</div></div>
+        <div class="popup-item"><div class="popup-item-label">Y Placette</div><div class="popup-item-value">${p.lat.toFixed(6)}</div></div>
         <div class="popup-item"><div class="popup-item-label">Altitude</div><div class="popup-item-value">${p.altitude ?? '--'} m</div></div>
-        <div class="popup-item"><div class="popup-item-label">Pente</div><div class="popup-item-value">${p.pente ?? '--'}°</div></div>
         <div class="popup-item"><div class="popup-item-label">Exposition</div><div class="popup-item-value">${p.exposition ?? '--'}°</div></div>
-        <div class="popup-item"><div class="popup-item-label">Distance repère</div><div class="popup-item-value">${p.distance ?? '--'} m</div></div>
+        <div class="popup-item"><div class="popup-item-label">Pente</div><div class="popup-item-value">${p.pente ?? '--'}°</div></div>
+        <div class="popup-item"><div class="popup-item-label">Distance au repère</div><div class="popup-item-value">${p.distance ?? '--'} m</div></div>
       </div>
       <div class="popup-actions">
         <button class="popup-btn" onclick="window.__geonav_navigate('${p.id}')">Y aller</button>
@@ -101,15 +101,15 @@ function buildReperePopup(p: Placette): string {
         </div>
       </div>
       <div class="popup-grid">
-        <div class="popup-item full"><div class="popup-item-label">Code placette</div><div class="popup-item-value">${p.code}</div></div>
-        <div class="popup-item"><div class="popup-item-label">X Repère</div><div class="popup-item-value">${p.repere?.lng.toFixed(6)}</div></div>
-        <div class="popup-item"><div class="popup-item-label">Y Repère</div><div class="popup-item-value">${p.repere?.lat.toFixed(6)}</div></div>
-        <div class="popup-item"><div class="popup-item-label">Altitude</div><div class="popup-item-value">${p.altitude ?? '--'} m</div></div>
-        <div class="popup-item"><div class="popup-item-label">Pente</div><div class="popup-item-value">${p.pente ?? '--'}°</div></div>
+        <div class="popup-item"><div class="popup-item-label">X Repère</div><div class="popup-item-value">${p.repere?.lng.toFixed(6) ?? '--'}</div></div>
+        <div class="popup-item"><div class="popup-item-label">Y Repère</div><div class="popup-item-value">${p.repere?.lat.toFixed(6) ?? '--'}</div></div>
+        <div class="popup-item"><div class="popup-item-label">Azimut repère</div><div class="popup-item-value">${p.azimut ?? '--'}°</div></div>
+        <div class="popup-item"><div class="popup-item-label">Distance à la placette</div><div class="popup-item-value">${p.distance ?? '--'} m</div></div>
       </div>
-      <div class="popup-actions">
-        <button class="popup-btn" onclick="window.__geonav_navigate('${p.id}')">Aller à la placette</button>
-        <button class="popup-btn parcours-btn" onclick="window.__geonav_addParcours('${p.id}')">+ Parcours</button>
+      <div class="popup-actions" style="display:flex;flex-direction:row;flex-wrap:wrap;gap:6px;">
+        <button class="popup-btn" style="flex:1;min-width:0;font-size:11px;padding:6px 4px;" onclick="window.__geonav_navigate('${p.id}')">Aller à la placette</button>
+        <button class="popup-btn" style="flex:1;min-width:0;font-size:11px;padding:6px 4px;" onclick="window.__geonav_navigateRepere('${p.id}')">Y aller (repère)</button>
+        <button class="popup-btn parcours-btn" style="flex:1;min-width:0;font-size:11px;padding:6px 4px;" onclick="window.__geonav_addParcours('${p.id}')">+ Parcours</button>
       </div>
     </div>`;
 }
@@ -179,6 +179,22 @@ function RouteFitBounds() {
     }
   }, [multiPointRoute, map]);
 
+  return null;
+}
+
+function FitToPlacettesHandler() {
+  const map = useMap();
+  useEffect(() => {
+    (window as any).__geonav_fitToPlacettes = () => {
+      const placettes = useDataStore.getState().placettes.filter(
+        (p) => !isNaN(p.lat) && !isNaN(p.lng)
+      );
+      if (placettes.length > 0) {
+        const bounds = L.latLngBounds(placettes.map((p) => [p.lat, p.lng] as [number, number]));
+        map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
+      }
+    };
+  }, [map]);
   return null;
 }
 
@@ -334,27 +350,51 @@ export function MapView() {
 
   // Register global popup handlers
   useEffect(() => {
+    const scrollWhenVisible = (id: string, block: ScrollLogicalPosition = 'center', retries = 15) => {
+      const el = document.getElementById(id);
+      if (el && el.offsetParent !== null) {
+        el.scrollIntoView({ behavior: 'smooth', block });
+      } else if (retries > 0) {
+        setTimeout(() => scrollWhenVisible(id, block, retries - 1), 50);
+      }
+    };
+
+    const scrollToNthChild = (listId: string, expectedCount: number, retries = 15) => {
+      const list = document.getElementById(listId);
+      if (list && list.children.length >= expectedCount && (list.lastElementChild as HTMLElement)?.offsetParent !== null) {
+        list.lastElementChild!.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      } else if (retries > 0) {
+        setTimeout(() => scrollToNthChild(listId, expectedCount, retries - 1), 50);
+      }
+    };
+
     (window as any).__geonav_navigate = (id: string) => {
       const p = useDataStore.getState().placettes.find((pl) => pl.id === id);
       if (p) {
         useNavigationStore.getState().setEndPoint({ type: 'placette', lat: p.lat, lng: p.lng, label: p.code, id: p.id });
+        useNavigationStore.getState().setNavSubTab('simple');
         getAppStoreState().setActiveTab('navigation');
+        scrollWhenVisible('nav-end-card', 'center');
       }
     };
     (window as any).__geonav_navigateRepere = (id: string) => {
       const p = useDataStore.getState().placettes.find((pl) => pl.id === id);
       if (p?.repere) {
         useNavigationStore.getState().setEndPoint({ type: 'repere', lat: p.repere.lat, lng: p.repere.lng, label: `Repère ${p.code}` });
+        useNavigationStore.getState().setNavSubTab('simple');
         getAppStoreState().setActiveTab('navigation');
+        scrollWhenVisible('nav-end-card', 'center');
       }
     };
     (window as any).__geonav_select = (id: string) => {
       useDataStore.getState().toggleSelectPlacette(id);
     };
     (window as any).__geonav_addParcours = (id: string) => {
+      const expectedCount = useNavigationStore.getState().multiPointPlacettes.length + 1;
       useNavigationStore.getState().addMultiPointPlacette(id);
       useNavigationStore.getState().setNavSubTab('multi');
       getAppStoreState().setActiveTab('navigation');
+      scrollToNthChild('multi-points-list', expectedCount);
     };
   }, []);
 
@@ -388,6 +428,7 @@ export function MapView() {
         <MapClickHandler />
         <MapSync />
         <RouteFitBounds />
+        <FitToPlacettesHandler />
 
         {/* Placettes — only concerned ones during navigation */}
         {showPlacettes && visiblePlacettes.map((p) => (

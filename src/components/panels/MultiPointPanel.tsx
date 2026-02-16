@@ -146,7 +146,7 @@ export function MultiPointPanel() {
           <span className="multi-list-title">Placettes sélectionnées</span>
           <span className="multi-list-count">{nav.multiPointPlacettes.length} placette(s)</span>
         </div>
-        <div className="multi-route-list">
+        <div id="multi-points-list" className="multi-route-list">
           {selectedPlacettesData.length === 0 ? (
             <div className="empty-list">
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="1.5">

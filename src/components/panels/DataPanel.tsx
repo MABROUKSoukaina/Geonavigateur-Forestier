@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { useDataStore } from '../../stores/useDataStore';
+import { useMapStore } from '../../stores/useMapStore';
 import { getExcelPreview, parseExcelFile, autoDetectMapping } from '../../services/excelParser';
 import { DEFAULT_PLACETTES } from '../../services/defaultData';
 import type { ColumnMapping } from '../../types';
@@ -16,6 +17,8 @@ const MAPPING_FIELDS: { key: keyof ColumnMapping; label: string; required: boole
   { key: 'altitude', label: 'ALTITUDE', required: false },
   { key: 'exposition', label: 'EXPOSITION', required: false },
   { key: 'strate', label: 'STRATE', required: false },
+  { key: 'distance', label: 'DISTANCE REPÈRE', required: false },
+  { key: 'repereDesc', label: 'DESCRIPTION REPÈRE', required: false },
 ];
 
 export function DataPanel() {
@@ -29,14 +32,31 @@ export function DataPanel() {
   const [dragover, setDragover] = useState(false);
   const [previewRows, setPreviewRows] = useState<Record<string, unknown>[]>([]);
   const [totalRows, setTotalRows] = useState(0);
+  const [parseError, setParseError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importSuccess, setImportSuccess] = useState<number | null>(null);
+  const [sampleCoord, setSampleCoord] = useState<string | null>(null);
 
   const handleFile = async (f: File) => {
     setFile(f);
-    const preview = await getExcelPreview(f);
-    setColumns(preview.columns);
-    setPreviewRows(preview.rows);
-    setTotalRows(preview.totalRows);
-    setMapping(autoDetectMapping(preview.columns));
+    setParseError(null);
+    setImportSuccess(null);
+    setSampleCoord(null);
+    setColumns([]);
+    setPreviewRows([]);
+    setLoading(true);
+    try {
+      const preview = await getExcelPreview(f);
+      setColumns(preview.columns);
+      setPreviewRows(preview.rows);
+      setTotalRows(preview.totalRows);
+      setMapping(autoDetectMapping(preview.columns));
+    } catch (err) {
+      setParseError(`Erreur de lecture : ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -48,9 +68,32 @@ export function DataPanel() {
 
   const handleImport = async () => {
     if (!file || !mapping.code || !mapping.x || !mapping.y) return;
-    const data = await parseExcelFile(file, mapping as ColumnMapping);
-    setPlacettes(data);
-    setDataSource('custom');
+    setImporting(true);
+    setParseError(null);
+    setImportSuccess(null);
+    setSampleCoord(null);
+    try {
+      const data = await parseExcelFile(file, mapping as ColumnMapping);
+      if (data.length === 0) {
+        setParseError('Aucune ligne valide trouvée. Vérifiez que les colonnes X, Y et CODE sont correctement mappées.');
+        return;
+      }
+      setPlacettes(data);
+      setDataSource('custom');
+      setImportSuccess(data.length);
+      setSampleCoord(`lat=${data[0].lat.toFixed(5)}, lng=${data[0].lng.toFixed(5)}`);
+      // Center map on new data
+      const avgLat = data.reduce((s, p) => s + p.lat, 0) / data.length;
+      const avgLng = data.reduce((s, p) => s + p.lng, 0) / data.length;
+      useMapStore.getState().setCenter([avgLat, avgLng]);
+      useMapStore.getState().setZoom(10);
+      // Also fit bounds if available
+      setTimeout(() => (window as any).__geonav_fitToPlacettes?.(), 300);
+    } catch (err) {
+      setParseError(`Erreur d'import : ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setImporting(false);
+    }
   };
 
   const restoreDefaults = () => {
@@ -63,11 +106,8 @@ export function DataPanel() {
     setTotalRows(0);
   };
 
-  // Columns to show in preview: use mapped ones if available, else first 3
-  const previewCols = columns.length > 0
-    ? [mapping.code, mapping.x, mapping.y].filter(Boolean) as string[]
-    : [];
-  const displayPreviewCols = previewCols.length > 0 ? previewCols : columns.slice(0, 3);
+  // Show all columns in preview
+  const displayPreviewCols = columns;
 
   return (
     <div>
@@ -96,10 +136,22 @@ export function DataPanel() {
         <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="1.5">
           <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
         </svg>
-        <p>{file ? file.name : 'Glissez un fichier Excel ou cliquez'}</p>
-        <p className="excel-formats" style={{ color: 'var(--text-muted)' }}>.xlsx, .xls</p>
-        <input ref={fileRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={(e) => { if (e.target.files?.[0]) handleFile(e.target.files[0]); }} />
+        <p style={{ maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '0 8px' }}>{file ? file.name : 'Glissez un fichier ou cliquez'}</p>
+        <p className="excel-formats" style={{ color: 'var(--text-muted)' }}>.xlsx, .xls, .csv</p>
+        <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={(e) => { if (e.target.files?.[0]) handleFile(e.target.files[0]); }} />
       </div>
+
+      {loading && (
+        <div style={{ textAlign: 'center', padding: '12px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+          Lecture du fichier...
+        </div>
+      )}
+
+      {parseError && (
+        <div style={{ marginTop: '12px', padding: '10px 14px', borderRadius: '8px', background: 'rgba(255,80,80,0.12)', color: '#ff6b6b', fontSize: '0.8rem' }}>
+          {parseError}
+        </div>
+      )}
 
       {/* Column mapping */}
       {columns.length > 0 && (
@@ -145,17 +197,18 @@ export function DataPanel() {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
                   <thead>
                     <tr>
-                      {displayPreviewCols.map((col) => (
-                        <th key={col} style={{
+                      {displayPreviewCols.map((col) => {
+                        const isMapped = Object.values(mapping).includes(col);
+                        return (<th key={col} style={{
                           padding: '8px 12px',
                           textAlign: 'left',
                           fontWeight: '600',
-                          color: 'var(--accent)',
-                          background: 'rgba(0,229,255,0.08)',
+                          color: isMapped ? 'var(--accent)' : 'var(--text-muted)',
+                          background: isMapped ? 'rgba(0,229,255,0.08)' : 'transparent',
                           borderBottom: '1px solid rgba(255,255,255,0.1)',
                           whiteSpace: 'nowrap',
-                        }}>{col}</th>
-                      ))}
+                        }}>{col}</th>);
+                      })}
                     </tr>
                   </thead>
                   <tbody>
@@ -178,10 +231,21 @@ export function DataPanel() {
             </div>
           )}
 
-          <button className="btn btn-primary" style={{ marginTop: '20px' }} onClick={handleImport} disabled={!mapping.code || !mapping.x || !mapping.y}>
+          <button className="btn btn-primary" style={{ marginTop: '20px' }} onClick={handleImport} disabled={!mapping.code || !mapping.x || !mapping.y || importing}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-            Appliquer les données
+            {importing ? 'Import en cours...' : 'Appliquer les données'}
           </button>
+
+          {importSuccess !== null && (
+            <div style={{ marginTop: '10px', padding: '10px 14px', borderRadius: '8px', background: 'rgba(0,200,100,0.12)', color: '#00c864', fontSize: '0.8rem', fontWeight: '600' }}>
+              ✓ {importSuccess} placettes importées avec succès
+              {sampleCoord && (
+                <div style={{ marginTop: '4px', fontSize: '0.72rem', fontWeight: '400', color: 'rgba(0,200,100,0.8)' }}>
+                  Exemple 1ère placette: {sampleCoord}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 

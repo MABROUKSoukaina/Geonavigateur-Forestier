@@ -69,6 +69,8 @@ export interface ColumnMapping {
   altitude?: string;
   exposition?: string;
   strate?: string;
+  distance?: string;
+  repereDesc?: string;
 }
 
 export const TRANSPORT_SPEEDS: Record<TransportMode, number> = {
