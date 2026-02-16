@@ -5,6 +5,7 @@ import { useMapStore } from '../../stores/useMapStore';
 import { useAppStore } from '../../stores/useAppStore';
 import { solveTSPRoute } from '../../services/routing';
 import { formatDistance, formatDuration } from '../../utils/format';
+import { getGpsPosition } from '../../utils/geo';
 import type { TransportMode } from '../../types';
 
 export function MultiPointPanel() {
@@ -48,9 +49,7 @@ export function MultiPointPanel() {
 
       if (nav.multiPointStartMode === 'gps') {
         try {
-          const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 5000 });
-          });
+          const pos = await getGpsPosition();
           startLat = pos.coords.latitude;
           startLng = pos.coords.longitude;
         } catch {
@@ -217,7 +216,7 @@ export function MultiPointPanel() {
 
       {/* ===== RESULT — styled like the screenshot ===== */}
       {nav.multiPointRoute && (
-        <div style={{ marginTop: '16px' }}>
+        <div className="multi-route-result">
           {/* Header: Parcours calculé + mode */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1rem', fontWeight: '700' }}>

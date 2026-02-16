@@ -6,6 +6,7 @@ import { useAppStore } from '../../stores/useAppStore';
 import { calculateRoute, calculateBirdFlight } from '../../services/routing';
 import { isOfflineRouterReady } from '../../services/offlineRouter';
 import { formatDistance, formatDuration } from '../../utils/format';
+import { getGpsPosition } from '../../utils/geo';
 import type { TransportMode } from '../../types';
 import { MultiPointPanel } from './MultiPointPanel';
 
@@ -113,20 +114,16 @@ export function NavigationPanel() {
     const setPoint = isStart ? nav.setStartPoint : nav.setEndPoint;
     // Show loading state immediately
     setPoint({ type: 'gps', lat: 0, lng: 0, label: 'Localisation en cours...' });
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
-        setPoint({ type: 'gps', lat, lng, label: `GPS: ${lat.toFixed(5)}, ${lng.toFixed(5)}` });
-        setCenter([lat, lng]); setZoom(16);
-      },
-      (err) => {
-        console.error('GPS error:', err);
-        setPoint(null as any);
-        alert(`Erreur GPS: ${err.code === 1 ? 'Permission refusée' : err.code === 2 ? 'Position indisponible' : 'Délai dépassé'}. Vérifiez que le GPS est activé et que le site utilise HTTPS.`);
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    );
+    getGpsPosition().then((pos) => {
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      setPoint({ type: 'gps', lat, lng, label: `GPS: ${lat.toFixed(5)}, ${lng.toFixed(5)}` });
+      setCenter([lat, lng]); setZoom(16);
+    }).catch((err) => {
+      console.error('GPS error:', err);
+      setPoint(null as any);
+      alert(`Erreur GPS: ${err.code === 1 ? 'Permission refusée' : err.code === 2 ? 'Position indisponible' : 'Délai dépassé'}. Vérifiez que la géolocalisation est autorisée dans votre navigateur.`);
+    });
   };
 
   const doCalculateRoute = async () => {

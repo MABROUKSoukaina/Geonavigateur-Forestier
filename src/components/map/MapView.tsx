@@ -6,6 +6,7 @@ import { useDataStore } from '../../stores/useDataStore';
 import { useNavigationStore } from '../../stores/useNavigationStore';
 import { useAppStore } from '../../stores/useAppStore';
 import { TILE_URLS, DEFAULT_CENTER, DEFAULT_ZOOM } from '../../utils/constants';
+import { getGpsPosition } from '../../utils/geo';
 import type { NavPoint, Placette, BasemapType } from '../../types';
 
 // ===== MARKER ICONS =====
@@ -492,18 +493,17 @@ export function MapView() {
         <button className={`map-btn ${gpsLoading ? 'gps-locating' : ''}`} onClick={() => {
           if (gpsLoading) return;
           setGpsLoading(true);
-          navigator.geolocation.getCurrentPosition(
-            (pos) => {
-              setGpsLoading(false);
-              const lat = pos.coords.latitude;
-              const lng = pos.coords.longitude;
-              setUserPos([lat, lng]);
-              useMapStore.getState().setCenter([lat, lng]);
-              useMapStore.getState().setZoom(16);
-            },
-            () => { setGpsLoading(false); alert('Erreur GPS : position indisponible'); },
-            { enableHighAccuracy: true, timeout: 10000 }
-          );
+          getGpsPosition().then((pos) => {
+            setGpsLoading(false);
+            const lat = pos.coords.latitude;
+            const lng = pos.coords.longitude;
+            setUserPos([lat, lng]);
+            useMapStore.getState().setCenter([lat, lng]);
+            useMapStore.getState().setZoom(16);
+          }).catch(() => {
+            setGpsLoading(false);
+            alert('Erreur GPS : position indisponible. Vérifiez que la géolocalisation est autorisée dans votre navigateur.');
+          });
         }} title="Ma position">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4m10-10h-4M6 12H2"/></svg>
         </button>

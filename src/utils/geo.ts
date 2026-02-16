@@ -1,5 +1,27 @@
 const R = 6371000; // Earth radius in meters
 
+/**
+ * Get GPS position with automatic fallback:
+ * 1. Try high-accuracy (GPS chip) with 15s timeout
+ * 2. On failure/timeout, retry with low-accuracy (WiFi/IP) with 10s timeout
+ */
+export function getGpsPosition(): Promise<GeolocationPosition> {
+  return new Promise((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(resolve, () => {
+      // High-accuracy failed → retry without it
+      navigator.geolocation.getCurrentPosition(resolve, reject, {
+        enableHighAccuracy: false,
+        timeout: 10000,
+        maximumAge: 30000,
+      });
+    }, {
+      enableHighAccuracy: true,
+      timeout: 15000,
+      maximumAge: 0,
+    });
+  });
+}
+
 export function haversine(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const dLat = toRad(lat2 - lat1);
   const dLng = toRad(lng2 - lng1);
