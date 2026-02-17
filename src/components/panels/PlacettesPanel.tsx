@@ -4,7 +4,7 @@ import { useMapStore } from '../../stores/useMapStore';
 import { useMemo } from 'react';
 
 export function PlacettesPanel() {
-  const { placettes, selectedPlacettes, searchQuery, setSearchQuery, toggleSelectPlacette, clearSelection } = useDataStore();
+  const { placettes, selectedPlacettes, searchQuery, setSearchQuery, toggleSelectPlacette, clearSelection, setPlacettes } = useDataStore();
   const { showPlacettes, showReperes, togglePlacettes, toggleReperes } = useAppStore();
   const setCenter = useMapStore((s) => s.setCenter);
   const setZoom = useMapStore((s) => s.setZoom);
@@ -78,15 +78,28 @@ export function PlacettesPanel() {
 
       {/* Actions */}
       {selectedPlacettes.length > 0 && (
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-          <button className="btn btn-secondary" style={{ flex: 1, padding: '10px', fontSize: '0.8rem' }} onClick={() => {
-            if (filtered.length > 0) {
-              const avgLat = filtered.reduce((s, p) => s + p.lat, 0) / filtered.length;
-              const avgLng = filtered.reduce((s, p) => s + p.lng, 0) / filtered.length;
-              setCenter([avgLat, avgLng]); setZoom(10);
-            }
-          }}>📍 Voir tout</button>
-          <button className="btn btn-danger" style={{ flex: 1, padding: '10px', fontSize: '0.8rem' }} onClick={clearSelection}>Effacer sélection</button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '12px' }}>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button className="btn btn-secondary" style={{ flex: 1, padding: '10px', fontSize: '0.8rem' }} onClick={() => {
+              if (filtered.length > 0) {
+                const avgLat = filtered.reduce((s, p) => s + p.lat, 0) / filtered.length;
+                const avgLng = filtered.reduce((s, p) => s + p.lng, 0) / filtered.length;
+                setCenter([avgLat, avgLng]); setZoom(10);
+              }
+            }}>📍 Voir tout</button>
+            <button className="btn btn-danger" style={{ flex: 1, padding: '10px', fontSize: '0.8rem' }} onClick={clearSelection}>Effacer sélection</button>
+          </div>
+          <button
+            className="btn btn-primary"
+            style={{ width: '100%', padding: '10px', fontSize: '0.8rem' }}
+            onClick={() => {
+              const kept = placettes.filter((p) => selectedPlacettes.includes(p.id));
+              setPlacettes(kept);
+              clearSelection();
+            }}
+          >
+            Garder les sélectionnées ({selectedPlacettes.length})
+          </button>
         </div>
       )}
 
@@ -98,7 +111,11 @@ export function PlacettesPanel() {
             <div className="placette-dot" />
             <div style={{ flex: 1 }}>
               <div className="placette-code">{p.code}</div>
-              <div className="placette-coords">{p.lat.toFixed(4)}, {p.lng.toFixed(4)}{p.altitude ? ` • ${p.altitude}m` : ''}</div>
+              <div className="placette-coords">
+                {p.lat.toFixed(4)}, {p.lng.toFixed(4)}
+                {p.altitude != null ? ` • alt: ${p.altitude}m` : ''}
+                {p.distance != null ? ` • dist. rep: ${p.distance}m` : ''}
+              </div>
             </div>
             {p.strate && <span className="placette-strate">{p.strate}</span>}
           </div>

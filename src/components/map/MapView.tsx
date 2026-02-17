@@ -13,10 +13,10 @@ import type { NavPoint, Placette, BasemapType } from '../../types';
 const icons = {
   placette: L.divIcon({
     className: 'custom-marker',
-    html: `<div style="width:28px;height:28px;background:linear-gradient(135deg,#58f572,#3ed957);border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+    html: `<div style="width:18px;height:18px;background:linear-gradient(135deg,#58f572,#3ed957);border:2px solid white;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">
+      <svg width="9" height="9" viewBox="0 0 24 24" fill="white"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
     </div>`,
-    iconSize: [28, 28], iconAnchor: [14, 14], popupAnchor: [0, -14],
+    iconSize: [18, 18], iconAnchor: [9, 9], popupAnchor: [0, -9],
   }),
   repere: L.divIcon({
     className: 'custom-marker',
@@ -30,10 +30,10 @@ const icons = {
   }),
   selected: L.divIcon({
     className: 'custom-marker',
-    html: `<div style="width:28px;height:28px;background:linear-gradient(135deg,#05fff4,#00e0d8);border:3px solid white;border-radius:50%;box-shadow:0 0 12px rgba(5,255,244,0.7),0 2px 8px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+    html: `<div style="width:22px;height:22px;background:linear-gradient(135deg,#05fff4,#00e0d8);border:2px solid white;border-radius:50%;box-shadow:0 0 10px rgba(5,255,244,0.7),0 2px 6px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="white"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
     </div>`,
-    iconSize: [28, 28], iconAnchor: [14, 14], popupAnchor: [0, -14],
+    iconSize: [22, 22], iconAnchor: [11, 11], popupAnchor: [0, -11],
   }),
   start: L.divIcon({
     className: 'custom-marker',
@@ -128,6 +128,7 @@ function MapClickHandler() {
 
   useMapEvents({
     click(e) {
+      if ((window as any).__geonav_measuring) return;
       const point: NavPoint = {
         type: 'map', lat: e.latlng.lat, lng: e.latlng.lng,
         label: `${e.latlng.lat.toFixed(5)}, ${e.latlng.lng.toFixed(5)}`,
@@ -147,17 +148,48 @@ function MapClickHandler() {
   return null;
 }
 
+function MeasureHandler({ onPoint }: { onPoint: (pt: [number, number]) => void }) {
+  useMapEvents({ click(e) { onPoint([e.latlng.lat, e.latlng.lng]); } });
+  return null;
+}
+
+function CoordinatesTracker({ onMove }: { onMove: (coords: [number, number] | null) => void }) {
+  useMapEvents({
+    mousemove(e) { onMove([e.latlng.lat, e.latlng.lng]); },
+    mouseout()  { onMove(null); },
+  });
+  return null;
+}
+
+function fmtDist(m: number): string {
+  return m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(2)} km`;
+}
+function calcTotalDist(pts: [number, number][]): number {
+  let d = 0;
+  for (let i = 1; i < pts.length; i++) d += L.latLng(pts[i - 1]).distanceTo(L.latLng(pts[i]));
+  return d;
+}
+
 function MapSync() {
   const map = useMap();
   const center = useMapStore((s) => s.center);
   const zoom = useMapStore((s) => s.zoom);
+  const sidebarOpen = useAppStore((s) => s.sidebarOpen);
   const prev = useRef({ center, zoom });
+
   useEffect(() => {
     if (center !== prev.current.center || zoom !== prev.current.zoom) {
       map.setView(center, zoom);
       prev.current = { center, zoom };
     }
   }, [center, zoom, map]);
+
+  // Invalidate Leaflet size after panel transition ends (300ms)
+  useEffect(() => {
+    const t = setTimeout(() => map.invalidateSize({ pan: false }), 320);
+    return () => clearTimeout(t);
+  }, [sidebarOpen, map]);
+
   return null;
 }
 
@@ -229,8 +261,8 @@ function MapLegend({ customLayers }: { customLayers: { id: string; name: string;
         <div className="map-legend-content">
           <div className="map-legend-title">Légende</div>
           <div className={`map-legend-item toggleable ${showPlacettes ? '' : 'hidden-layer'}`} onClick={togglePlacettes}>
-            <div style={{ width: 20, height: 20, borderRadius: '50%', background: 'linear-gradient(135deg,#58f572,#3ed957)', border: '2px solid white', boxShadow: '0 1px 4px rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="white"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+            <div style={{ width: 14, height: 14, borderRadius: '50%', background: 'linear-gradient(135deg,#58f572,#3ed957)', border: '2px solid white', boxShadow: '0 1px 4px rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <svg width="7" height="7" viewBox="0 0 24 24" fill="white"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
             </div>
             <span>Placettes</span>
             <span className="legend-eye">{showPlacettes ? <EyeOpen /> : <EyeClosed />}</span>
@@ -324,6 +356,11 @@ export function MapView() {
   const tile = TILE_URLS[basemap];
   const [userPos, setUserPos] = useState<[number, number] | null>(null);
   const [gpsLoading, setGpsLoading] = useState(false);
+  const [measuring, setMeasuring] = useState(false);
+  const [measurePoints, setMeasurePoints] = useState<[number, number][]>([]);
+  const [mouseCoords, setMouseCoords] = useState<[number, number] | null>(null);
+
+  useEffect(() => { (window as any).__geonav_measuring = measuring; }, [measuring]);
 
   // Determine if we're in active navigation mode (route calculated)
   const isNavigating = !!(route && route.coordinates.length > 0);
@@ -425,13 +462,41 @@ export function MapView() {
   };
 
   return (
-    <div style={{ width: '100%', height: '100%', cursor: clickMode !== 'none' ? 'crosshair' : undefined }}>
+    <div style={{ width: '100%', height: '100%', position: 'relative', cursor: (clickMode !== 'none' || measuring) ? 'crosshair' : undefined }}>
       <MapContainer center={DEFAULT_CENTER} zoom={DEFAULT_ZOOM} style={{ width: '100%', height: '100%' }} zoomControl={false}>
         <TileLayer url={tile.url} attribution={tile.attribution} maxZoom={tile.maxZoom} />
         <MapClickHandler />
         <MapSync />
         <RouteFitBounds />
         <FitToPlacettesHandler />
+        <CoordinatesTracker onMove={setMouseCoords} />
+
+        {/* Measurement tool */}
+        {measuring && <MeasureHandler onPoint={(pt) => setMeasurePoints((prev) => [...prev, pt])} />}
+        {/* Measurement dots — show from first point */}
+        {measurePoints.map((pt, i) => (
+          <Marker key={`mpt-${i}`} position={pt}
+            icon={L.divIcon({ className: '', html: `<div style="width:10px;height:10px;background:#00d4aa;border:2px solid white;border-radius:50%;"></div>`, iconSize: [10, 10], iconAnchor: [5, 5] })}
+          />
+        ))}
+        {/* Measurement line + segment labels — from second point */}
+        {measurePoints.length >= 2 && (
+          <>
+            <Polyline positions={measurePoints} pathOptions={{ color: '#00d4aa', weight: 2.5, opacity: 1, dashArray: '6,4' }} />
+            {measurePoints.slice(1).map((pt, i) => {
+              const prev = measurePoints[i];
+              const segDist = L.latLng(prev).distanceTo(L.latLng(pt));
+              const label = fmtDist(segDist);
+              const w = label.length * 7 + 16;
+              return (
+                <Marker key={`mlbl-${i}`}
+                  position={[(prev[0] + pt[0]) / 2, (prev[1] + pt[1]) / 2]}
+                  icon={L.divIcon({ className: '', html: `<div style="width:${w}px;height:20px;position:relative"><div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:rgba(13,27,42,0.9);color:#00d4aa;padding:2px 7px;border-radius:4px;font-size:11px;white-space:nowrap;border:1px solid #00d4aa">${label}</div></div>`, iconSize: [w, 20], iconAnchor: [w / 2, 10] })}
+                />
+              );
+            })}
+          </>
+        )}
 
         {/* Placettes — only concerned ones during navigation */}
         {showPlacettes && visiblePlacettes.map((p) => (
@@ -532,6 +597,25 @@ export function MapView() {
         </div>
       )}
 
+      {/* Measurement banner */}
+      {measuring && (
+        <div style={{ position: 'absolute', top: 20, left: '50%', transform: 'translateX(-50%)', zIndex: 1000, background: 'var(--bg-card)', backdropFilter: 'blur(20px)', border: '1px solid var(--accent)', borderRadius: 10, padding: '10px 20px', fontSize: '0.85rem', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="8" width="20" height="8" rx="2"/><line x1="6" y1="8" x2="6" y2="12"/><line x1="10" y1="8" x2="10" y2="14"/><line x1="14" y1="8" x2="14" y2="12"/><line x1="18" y1="8" x2="18" y2="14"/></svg>
+          {measurePoints.length === 0 ? 'Cliquez pour commencer la mesure' : `Total : ${fmtDist(calcTotalDist(measurePoints))}`}
+          {measurePoints.length > 0 && (
+            <button onClick={() => setMeasurePoints([])} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.75rem', padding: '0 4px' }}>Effacer</button>
+          )}
+          <button onClick={() => { setMeasuring(false); setMeasurePoints([]); }} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1rem' }}>✕</button>
+        </div>
+      )}
+
+      {/* Measure button — left side */}
+      <div style={{ position: 'absolute', bottom: 30, left: 20, zIndex: 1000 }}>
+        <button className={`map-btn ${measuring ? 'active' : ''}`} onClick={() => { setMeasuring(!measuring); setMeasurePoints([]); }} title="Mesurer une distance">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="8" width="20" height="8" rx="2"/><line x1="6" y1="8" x2="6" y2="12"/><line x1="10" y1="8" x2="10" y2="14"/><line x1="14" y1="8" x2="14" y2="12"/><line x1="18" y1="8" x2="18" y2="14"/></svg>
+        </button>
+      </div>
+
       {/* Map controls */}
       <div className="map-controls">
         <button className={`map-btn ${gpsLoading ? 'gps-locating' : ''}`} onClick={() => {
@@ -559,11 +643,26 @@ export function MapView() {
         </button>
       </div>
 
-      {/* ===== BASEMAP SWITCHER — top right ===== */}
-      <MapBasemapSwitcher basemap={basemap} />
+      {/* Coordinates display */}
+      {mouseCoords && (
+        <div style={{ position: 'absolute', bottom: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 1000, fontSize: '0.72rem', color: 'white', display: 'flex', alignItems: 'center', gap: 12, pointerEvents: 'none', background: 'rgba(0,0,0,0.35)', borderRadius: 6, padding: '3px 10px' }}>
+          <span>Lat: <b>{mouseCoords[0].toFixed(6)}</b></span>
+          <span>Lng: <b>{mouseCoords[1].toFixed(6)}</b></span>
+        </div>
+      )}
 
-      {/* ===== MAP LEGEND — bottom left ===== */}
-      <MapLegend customLayers={customLayers} />
+      {/* ===== TOP-RIGHT WIDGETS: NORTH ARROW + LEGEND + BASEMAP ===== */}
+      <div style={{ position: 'absolute', top: 20, right: 20, zIndex: 1000, display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
+        {/* North arrow */}
+        <div style={{ width: 42, height: 42, background: 'var(--bg-card)', backdropFilter: 'blur(20px)', border: '1px solid var(--border)', borderRadius: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1 }} title="Nord">
+          <svg width="14" height="18" viewBox="0 0 14 18" fill="none">
+            <polygon points="7,0 0,18 7,13 14,18" fill="white" />
+          </svg>
+          <span style={{ fontSize: '9px', fontWeight: 700, color: 'white', lineHeight: 1, letterSpacing: '0.5px' }}>N</span>
+        </div>
+        <MapLegend customLayers={customLayers} />
+        <MapBasemapSwitcher basemap={basemap} />
+      </div>
     </div>
   );
 }

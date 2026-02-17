@@ -148,7 +148,7 @@ export function autoDetectMapping(columns: string[]): Partial<ColumnMapping> {
   mapping.altitude = find(['altitude', 'alt', 'elev', 'elevation', 'z']);
   mapping.exposition = find(['exposition', 'expo', 'aspect', 'exposition_']);
   mapping.strate = find(['strate_carto', 'strate', 'stratum', 'type_strate']);
-  mapping.distance = find(['distance_point', 'distance_repere', 'dist_rep', 'distance']);
+  mapping.distance = find(['distance_point', 'distance_repere', 'dist_rep', 'distance', 'dist', 'dist_repere', 'dist_rep_m', 'distance_m', 'dist_m']);
   mapping.repereDesc = find(['description_rep', 'desc_rep', 'repere_desc', 'repere_note', 'description']);
 
   return mapping;

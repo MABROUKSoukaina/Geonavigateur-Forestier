@@ -42,8 +42,8 @@ export default function App() {
         </svg>
       </button>
 
-      {/* Map fills entire background */}
-      <div style={{ width: '100%', height: '100%' }}>
+      {/* Map fills remaining space */}
+      <div style={{ flex: 1, height: '100%', minWidth: 0 }}>
         <MapView />
       </div>
     </div>
