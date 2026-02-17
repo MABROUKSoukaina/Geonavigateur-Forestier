@@ -12,6 +12,8 @@ interface NavigationState {
   multiPointTransport: TransportMode;
   isCalculating: boolean;
   navSubTab: 'simple' | 'multi';
+  followGps: boolean;
+  setFollowGps: (v: boolean) => void;
 
   setStartPoint: (p: NavPoint | null) => void;
   setEndPoint: (p: NavPoint | null) => void;
@@ -40,6 +42,8 @@ export const useNavigationStore = create<NavigationState>((set) => ({
   multiPointTransport: 'walk',
   isCalculating: false,
   navSubTab: 'simple',
+  followGps: false,
+  setFollowGps: (followGps) => set({ followGps }),
 
   setStartPoint: (startPoint) => set({ startPoint }),
   setEndPoint: (endPoint) => set({ endPoint }),

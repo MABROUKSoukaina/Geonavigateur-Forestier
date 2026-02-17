@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMapEvents, GeoJSON, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { useMapStore } from '../../stores/useMapStore';
@@ -8,6 +8,7 @@ import { useAppStore } from '../../stores/useAppStore';
 import { TILE_URLS, DEFAULT_CENTER, DEFAULT_ZOOM } from '../../utils/constants';
 import { getGpsPosition } from '../../utils/geo';
 import type { NavPoint, Placette, BasemapType } from '../../types';
+import { TRANSPORT_SPEEDS } from '../../types';
 
 // ===== MARKER ICONS =====
 const icons = {
@@ -168,6 +169,108 @@ function calcTotalDist(pts: [number, number][]): number {
   let d = 0;
   for (let i = 1; i < pts.length; i++) d += L.latLng(pts[i - 1]).distanceTo(L.latLng(pts[i]));
   return d;
+}
+
+// ===== CLUSTER ICON =====
+function makeClusterIcon(count: number) {
+  const size = count < 10 ? 36 : count < 100 ? 44 : 52;
+  const fs = count < 10 ? 14 : 12;
+  return L.divIcon({
+    html: `<div style="width:${size}px;height:${size}px;background:linear-gradient(135deg,#58f572,#3ed957);border:2.5px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,0.35),0 0 0 4px rgba(88,245,114,0.25);display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:${fs}px;font-family:'Space Mono',monospace;">${count}</div>`,
+    className: '',
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+  });
+}
+
+// ===== CLUSTER LAYER (no external library) =====
+interface ClusterGroup { lat: number; lng: number; ids: string[]; }
+
+function ClusterLayer({
+  placettes,
+  getIconFn,
+}: {
+  placettes: Placette[];
+  getIconFn: (id: string) => L.DivIcon | L.Icon;
+}) {
+  const map = useMap();
+  const [groups, setGroups] = useState<ClusterGroup[]>([]);
+
+  const compute = useCallback(() => {
+    const RADIUS = 60; // pixels
+    const pts = placettes.map((p) => ({
+      id: p.id, lat: p.lat, lng: p.lng,
+      px: map.latLngToLayerPoint([p.lat, p.lng]),
+    }));
+    const used = new Set<string>();
+    const result: ClusterGroup[] = [];
+    for (const p of pts) {
+      if (used.has(p.id)) continue;
+      const members = [p];
+      used.add(p.id);
+      for (const q of pts) {
+        if (used.has(q.id)) continue;
+        if (p.px.distanceTo(q.px) < RADIUS) { members.push(q); used.add(q.id); }
+      }
+      result.push({
+        lat: members.reduce((s, m) => s + m.lat, 0) / members.length,
+        lng: members.reduce((s, m) => s + m.lng, 0) / members.length,
+        ids: members.map((m) => m.id),
+      });
+    }
+    setGroups(result);
+  }, [placettes, map]);
+
+  useEffect(() => {
+    compute();
+    map.on('zoomend moveend', compute);
+    return () => { map.off('zoomend moveend', compute); };
+  }, [compute, map]);
+
+  return (
+    <>
+      {groups.map((g, i) => {
+        if (g.ids.length > 1) {
+          return (
+            <Marker
+              key={`cl-${i}`}
+              position={[g.lat, g.lng]}
+              icon={makeClusterIcon(g.ids.length)}
+              eventHandlers={{
+                click: () => {
+                  const bounds = L.latLngBounds(
+                    g.ids.map((id) => { const p = placettes.find((x) => x.id === id)!; return [p.lat, p.lng] as [number, number]; })
+                  );
+                  map.fitBounds(bounds, { padding: [60, 60], maxZoom: 17 });
+                },
+              }}
+            />
+          );
+        }
+        const p = placettes.find((x) => x.id === g.ids[0])!;
+        if (!p) return null;
+        return (
+          <Marker key={p.id} position={[p.lat, p.lng]} icon={getIconFn(p.id)}>
+            <Popup maxWidth={320} minWidth={260}>
+              <div dangerouslySetInnerHTML={{ __html: buildPlacettePopup(p) }} />
+            </Popup>
+          </Marker>
+        );
+      })}
+    </>
+  );
+}
+
+// ===== GPS FOLLOW HANDLER =====
+function GpsFollowHandler({ userPos }: { userPos: [number, number] | null }) {
+  const map = useMap();
+  const followGps = useNavigationStore((s) => s.followGps);
+  useEffect(() => {
+    if (followGps && userPos) {
+      map.setView(userPos, Math.max(map.getZoom(), 15), { animate: true, duration: 0.5 } as any);
+    }
+  }, [userPos, followGps, map]);
+  return null;
 }
 
 function MapSync() {
@@ -351,7 +454,8 @@ export function MapView() {
   const showGpsMarker = useAppStore((s) => s.showGpsMarker);
   const showRoute = useAppStore((s) => s.showRoute);
   const showLastMile = useAppStore((s) => s.showLastMile);
-  const { startPoint, endPoint, route, multiPointRoute } = useNavigationStore();
+  const clusteringEnabled = useAppStore((s) => s.clusteringEnabled);
+  const { startPoint, endPoint, route, multiPointRoute, transportMode, multiPointTransport, followGps, setFollowGps } = useNavigationStore();
   const showRoadNetwork = useAppStore((s) => s.showRoadNetwork);
   const tile = TILE_URLS[basemap];
   const [userPos, setUserPos] = useState<[number, number] | null>(null);
@@ -387,6 +491,31 @@ export function MapView() {
   const visiblePlacettes = (isNavigating || isMultiNavigating)
     ? placettes.filter((p) => navigationPlacetteIds.has(p.id))
     : placettes;
+
+  // ===== LIVE NAVIGATION =====
+  const remainingDist = useMemo(() => {
+    if (!userPos) return 0;
+    if (isNavigating && endPoint) return L.latLng(userPos).distanceTo([endPoint.lat, endPoint.lng]);
+    if (isMultiNavigating && multiPointRoute) {
+      const coords = multiPointRoute.routeCoordinates;
+      if (coords.length > 0) return L.latLng(userPos).distanceTo(coords[coords.length - 1]);
+    }
+    return 0;
+  }, [userPos, endPoint, isNavigating, isMultiNavigating, multiPointRoute]);
+
+  const etaStr = useMemo(() => {
+    const mode = isMultiNavigating ? multiPointTransport : transportMode;
+    const speedKmh = TRANSPORT_SPEEDS[mode];
+    if (!speedKmh) return '--';
+    const minutes = Math.round((remainingDist / 1000 / speedKmh) * 60);
+    if (minutes < 60) return `${minutes} min`;
+    return `${Math.floor(minutes / 60)}h${String(minutes % 60).padStart(2, '0')}`;
+  }, [remainingDist, transportMode, multiPointTransport, isMultiNavigating]);
+
+  // Stop following when route is cleared
+  useEffect(() => {
+    if (!isNavigating && !isMultiNavigating) setFollowGps(false);
+  }, [isNavigating, isMultiNavigating, setFollowGps]);
 
   // Register global popup handlers
   useEffect(() => {
@@ -470,6 +599,7 @@ export function MapView() {
         <RouteFitBounds />
         <FitToPlacettesHandler />
         <CoordinatesTracker onMove={setMouseCoords} />
+        <GpsFollowHandler userPos={userPos} />
 
         {/* Measurement tool */}
         {measuring && <MeasureHandler onPoint={(pt) => setMeasurePoints((prev) => [...prev, pt])} />}
@@ -498,8 +628,11 @@ export function MapView() {
           </>
         )}
 
-        {/* Placettes — only concerned ones during navigation */}
-        {showPlacettes && visiblePlacettes.map((p) => (
+        {/* Placettes — clustered or individual */}
+        {showPlacettes && clusteringEnabled && !isNavigating && !isMultiNavigating && (
+          <ClusterLayer placettes={visiblePlacettes} getIconFn={getIcon} />
+        )}
+        {showPlacettes && (!clusteringEnabled || isNavigating || isMultiNavigating) && visiblePlacettes.map((p) => (
           <Marker key={p.id} position={[p.lat, p.lng]} icon={getIcon(p.id)}>
             <Popup maxWidth={320} minWidth={260}>
               <div dangerouslySetInnerHTML={{ __html: buildPlacettePopup(p) }} />
@@ -616,8 +749,41 @@ export function MapView() {
         </button>
       </div>
 
+      {/* Live navigation banner */}
+      {followGps && (isNavigating || isMultiNavigating) && userPos && (
+        <div className="live-nav-banner">
+          <div className="live-nav-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg>
+          </div>
+          <div className="live-nav-stats">
+            <div className="live-nav-stat">
+              <span className="live-nav-label">Restant</span>
+              <span className="live-nav-value">{fmtDist(remainingDist)}</span>
+            </div>
+            <div className="live-nav-sep" />
+            <div className="live-nav-stat">
+              <span className="live-nav-label">ETA</span>
+              <span className="live-nav-value">{etaStr}</span>
+            </div>
+          </div>
+          <button className="live-nav-stop" onClick={() => setFollowGps(false)} title="Arrêter le suivi">✕</button>
+        </div>
+      )}
+
       {/* Map controls */}
       <div className="map-controls">
+        {/* Follow GPS — only when route is active */}
+        {(isNavigating || isMultiNavigating) && (
+          <button
+            className={`map-btn ${followGps ? 'active' : ''}`}
+            onClick={() => setFollowGps(!followGps)}
+            title={followGps ? 'Arrêter le suivi GPS' : 'Suivre ma position en temps réel'}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z" fill={followGps ? 'currentColor' : 'none'}/>
+            </svg>
+          </button>
+        )}
         <button className={`map-btn ${gpsLoading ? 'gps-locating' : ''}`} onClick={() => {
           if (gpsLoading) return;
           setGpsLoading(true);

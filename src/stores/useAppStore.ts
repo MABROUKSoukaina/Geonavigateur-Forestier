@@ -11,6 +11,7 @@ interface AppState {
   showRoute: boolean;
   showLastMile: boolean;
   sidebarOpen: boolean;
+  clusteringEnabled: boolean;
   setRoutingMode: (mode: RoutingMode) => void;
   setActiveTab: (tab: TabType) => void;
   toggleRoadNetwork: () => void;
@@ -21,6 +22,7 @@ interface AppState {
   toggleLastMile: () => void;
   toggleSidebar: () => void;
   setSidebarOpen: (v: boolean) => void;
+  toggleClustering: () => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -33,6 +35,7 @@ export const useAppStore = create<AppState>((set) => ({
   showRoute: true,
   showLastMile: true,
   sidebarOpen: true,
+  clusteringEnabled: true,
   setRoutingMode: (mode) => set({ routingMode: mode }),
   setActiveTab: (tab) => set({ activeTab: tab }),
   toggleRoadNetwork: () => set((s) => ({ showRoadNetwork: !s.showRoadNetwork })),
@@ -43,4 +46,5 @@ export const useAppStore = create<AppState>((set) => ({
   toggleLastMile: () => set((s) => ({ showLastMile: !s.showLastMile })),
   toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
   setSidebarOpen: (v) => set({ sidebarOpen: v }),
+  toggleClustering: () => set((s) => ({ clusteringEnabled: !s.clusteringEnabled })),
 }));

@@ -5,7 +5,7 @@ import { useMemo } from 'react';
 
 export function PlacettesPanel() {
   const { placettes, selectedPlacettes, searchQuery, setSearchQuery, toggleSelectPlacette, clearSelection, setPlacettes } = useDataStore();
-  const { showPlacettes, showReperes, togglePlacettes, toggleReperes } = useAppStore();
+  const { showPlacettes, showReperes, togglePlacettes, toggleReperes, clusteringEnabled, toggleClustering } = useAppStore();
   const setCenter = useMapStore((s) => s.setCenter);
   const setZoom = useMapStore((s) => s.setZoom);
 
@@ -48,6 +48,10 @@ export function PlacettesPanel() {
         <div className="layer-toggle-item">
           <span className="layer-toggle-label">Repères</span>
           <div className={`toggle-switch ${showReperes ? 'active' : ''}`} onClick={toggleReperes} />
+        </div>
+        <div className="layer-toggle-item">
+          <span className="layer-toggle-label">Clustering</span>
+          <div className={`toggle-switch ${clusteringEnabled ? 'active' : ''}`} onClick={toggleClustering} />
         </div>
       </div>
 
