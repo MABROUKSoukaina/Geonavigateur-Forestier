@@ -99,20 +99,37 @@ body {
 
 /* ===== MOBILE ===== */
 @media (max-width: 768px) {
+  /* Stack vertically: map on top, panel below */
+  .app-layout {
+    flex-direction: column;
+    position: relative;
+  }
+
+  /* Map wrapper takes remaining vertical space above the panel */
+  .map-wrapper {
+    order: 1;
+    flex: 1;
+    height: auto !important;
+    min-height: 0;
+    min-width: 0;
+  }
+
+  /* Panel sits below the map as a normal flex child */
   .side-panel {
-    position: fixed;
+    position: relative;
+    order: 2;
     width: 100% !important;
     min-width: unset !important;
     height: 58%;
-    top: auto;
-    bottom: 0;
-    left: 0;
+    flex-shrink: 0;
     border-right: none;
     border-top: 1px solid var(--border);
     border-radius: 20px 20px 0 0;
-    transition: transform 0.3s ease;
+    transition: height 0.3s ease;
     overflow: hidden;
   }
+
+  /* Drag-handle pill at top of panel */
   .side-panel::before {
     content: '';
     display: block;
@@ -123,25 +140,37 @@ body {
     margin: 10px auto 4px;
     flex-shrink: 0;
   }
+
+  /* Collapsed: show only the handle */
   .side-panel.collapsed {
     width: 100% !important;
-    transform: translateY(calc(100% - 52px));
+    height: 48px;
   }
+
+  /* Toggle button centered at the map/panel boundary */
   .toggle-btn {
+    position: absolute;
     top: auto;
-    bottom: calc(58% + 12px);
+    /* button center sits exactly on the panel top edge (58% from bottom, half button height offset) */
+    bottom: calc(58% - 22px);
     left: 50% !important;
     transform: translateX(-50%);
     border-radius: 50%;
     width: 44px;
     height: 44px;
+    z-index: 1100;
+    transition: bottom 0.3s ease;
   }
   .side-panel.collapsed ~ .toggle-btn {
-    bottom: 64px;
+    /* center on the collapsed panel top edge (48px from bottom) */
+    bottom: 26px;
   }
+
+  /* Map controls and widgets: normal positions — map is correctly sized */
   .map-controls {
-    bottom: auto;
-    top: 20px;
+    bottom: 30px;
+    top: auto;
+    right: 20px;
   }
 }
 
@@ -1270,6 +1299,33 @@ body {
   background: #4285f4;
 }
 
+/* ===== MEASURE BUTTON CONTAINER ===== */
+.map-measure-container {
+  position: absolute;
+  bottom: 30px;
+  left: 20px;
+  z-index: 1000;
+}
+
+/* ===== COORDINATES DISPLAY ===== */
+.map-coords-display {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  font-size: 0.72rem;
+  color: white;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  pointer-events: none;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 6px;
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+
 /* ===== MAP CONTROLS ===== */
 .map-controls {
   position: absolute;
@@ -1610,13 +1666,6 @@ body {
   background: var(--accent);
 }
 
-/* ===== RESPONSIVE ===== */
-@media (max-width: 768px) {
-  .map-controls {
-    bottom: auto;
-    top: 20px;
-  }
-}
 
 /* ===== AUTOCOMPLETE ===== */
 .autocomplete-wrapper {

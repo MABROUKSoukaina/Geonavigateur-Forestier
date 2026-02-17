@@ -610,7 +610,7 @@ export function MapView() {
       )}
 
       {/* Measure button — left side */}
-      <div style={{ position: 'absolute', bottom: 30, left: 20, zIndex: 1000 }}>
+      <div className="map-measure-container">
         <button className={`map-btn ${measuring ? 'active' : ''}`} onClick={() => { setMeasuring(!measuring); setMeasurePoints([]); }} title="Mesurer une distance">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="8" width="20" height="8" rx="2"/><line x1="6" y1="8" x2="6" y2="12"/><line x1="10" y1="8" x2="10" y2="14"/><line x1="14" y1="8" x2="14" y2="12"/><line x1="18" y1="8" x2="18" y2="14"/></svg>
         </button>
@@ -645,7 +645,7 @@ export function MapView() {
 
       {/* Coordinates display */}
       {mouseCoords && (
-        <div style={{ position: 'absolute', bottom: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 1000, fontSize: '0.72rem', color: 'white', display: 'flex', alignItems: 'center', gap: 12, pointerEvents: 'none', background: 'rgba(0,0,0,0.35)', borderRadius: 6, padding: '3px 10px' }}>
+        <div className="map-coords-display">
           <span>Lat: <b>{mouseCoords[0].toFixed(6)}</b></span>
           <span>Lng: <b>{mouseCoords[1].toFixed(6)}</b></span>
         </div>
