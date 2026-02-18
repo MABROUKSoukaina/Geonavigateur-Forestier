@@ -59,6 +59,6 @@ export const useNavigationStore = create<NavigationState>((set) => ({
   setMultiPointTransport: (multiPointTransport) => set({ multiPointTransport }),
   setIsCalculating: (isCalculating) => set({ isCalculating }),
   setNavSubTab: (navSubTab) => set({ navSubTab }),
-  clearRoute: () => set({ route: null }),
+  clearRoute: () => set({ route: null, startPoint: null, endPoint: null }),
   clearAll: () => set({ startPoint: null, endPoint: null, route: null, multiPointRoute: null, multiPointPlacettes: [] }),
 }));

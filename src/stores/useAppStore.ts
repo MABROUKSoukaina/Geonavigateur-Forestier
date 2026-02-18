@@ -4,7 +4,9 @@ import type { RoutingMode, TabType } from '../types';
 interface AppState {
   routingMode: RoutingMode;
   activeTab: TabType;
-  showRoadNetwork: boolean;
+  showRoadRoutes: boolean;
+  showRoadPistes: boolean;
+  showRoadVoies: boolean;
   showPlacettes: boolean;
   showReperes: boolean;
   showGpsMarker: boolean;
@@ -14,7 +16,9 @@ interface AppState {
   clusteringEnabled: boolean;
   setRoutingMode: (mode: RoutingMode) => void;
   setActiveTab: (tab: TabType) => void;
-  toggleRoadNetwork: () => void;
+  toggleRoadRoutes: () => void;
+  toggleRoadPistes: () => void;
+  toggleRoadVoies: () => void;
   togglePlacettes: () => void;
   toggleReperes: () => void;
   toggleGpsMarker: () => void;
@@ -28,7 +32,9 @@ interface AppState {
 export const useAppStore = create<AppState>((set) => ({
   routingMode: 'offline',
   activeTab: 'navigation',
-  showRoadNetwork: true,
+  showRoadRoutes: true,
+  showRoadPistes: true,
+  showRoadVoies: true,
   showPlacettes: true,
   showReperes: true,
   showGpsMarker: true,
@@ -38,7 +44,9 @@ export const useAppStore = create<AppState>((set) => ({
   clusteringEnabled: true,
   setRoutingMode: (mode) => set({ routingMode: mode }),
   setActiveTab: (tab) => set({ activeTab: tab }),
-  toggleRoadNetwork: () => set((s) => ({ showRoadNetwork: !s.showRoadNetwork })),
+  toggleRoadRoutes: () => set((s) => ({ showRoadRoutes: !s.showRoadRoutes })),
+  toggleRoadPistes: () => set((s) => ({ showRoadPistes: !s.showRoadPistes })),
+  toggleRoadVoies: () => set((s) => ({ showRoadVoies: !s.showRoadVoies })),
   togglePlacettes: () => set((s) => ({ showPlacettes: !s.showPlacettes })),
   toggleReperes: () => set((s) => ({ showReperes: !s.showReperes })),
   toggleGpsMarker: () => set((s) => ({ showGpsMarker: !s.showGpsMarker })),

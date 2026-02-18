@@ -13,7 +13,18 @@ const TABS: { key: TabType; label: string }[] = [
 ];
 
 export function Sidebar() {
-  const { routingMode, setRoutingMode, activeTab, setActiveTab, showRoadNetwork, toggleRoadNetwork } = useAppStore();
+  const { routingMode, setRoutingMode, activeTab, setActiveTab,
+    showRoadRoutes, showRoadPistes, showRoadVoies,
+    toggleRoadRoutes, toggleRoadPistes, toggleRoadVoies } = useAppStore();
+
+  // Master toggle: active if at least one type is visible
+  const showRoadNetwork = showRoadRoutes || showRoadPistes || showRoadVoies;
+  const toggleRoadNetwork = () => {
+    // If any are on → turn all off; if all off → turn all on
+    const allOff = !showRoadRoutes && !showRoadPistes && !showRoadVoies;
+    if (allOff) { toggleRoadRoutes(); toggleRoadPistes(); toggleRoadVoies(); }
+    else { if (showRoadRoutes) toggleRoadRoutes(); if (showRoadPistes) toggleRoadPistes(); if (showRoadVoies) toggleRoadVoies(); }
+  };
 
   return (
     <>

@@ -189,9 +189,11 @@ interface ClusterGroup { lat: number; lng: number; ids: string[]; }
 function ClusterLayer({
   placettes,
   getIconFn,
+  onClusteredIds,
 }: {
   placettes: Placette[];
   getIconFn: (id: string) => L.DivIcon | L.Icon;
+  onClusteredIds?: (ids: Set<string>) => void;
 }) {
   const map = useMap();
   const [groups, setGroups] = useState<ClusterGroup[]>([]);
@@ -219,7 +221,13 @@ function ClusterLayer({
       });
     }
     setGroups(result);
-  }, [placettes, map]);
+    // Notify parent which placette IDs are swallowed into a multi-member cluster
+    if (onClusteredIds) {
+      const clustered = new Set<string>();
+      result.filter((g) => g.ids.length > 1).forEach((g) => g.ids.forEach((id) => clustered.add(id)));
+      onClusteredIds(clustered);
+    }
+  }, [placettes, map, onClusteredIds]);
 
   useEffect(() => {
     compute();
@@ -348,11 +356,17 @@ function MapLegend({ customLayers }: { customLayers: { id: string; name: string;
   const showGpsMarker = useAppStore((s) => s.showGpsMarker);
   const showRoute = useAppStore((s) => s.showRoute);
   const showLastMile = useAppStore((s) => s.showLastMile);
+  const showRoadRoutes = useAppStore((s) => s.showRoadRoutes);
+  const showRoadPistes = useAppStore((s) => s.showRoadPistes);
+  const showRoadVoies = useAppStore((s) => s.showRoadVoies);
   const togglePlacettes = useAppStore((s) => s.togglePlacettes);
   const toggleReperes = useAppStore((s) => s.toggleReperes);
   const toggleGpsMarker = useAppStore((s) => s.toggleGpsMarker);
   const toggleRoute = useAppStore((s) => s.toggleRoute);
   const toggleLastMile = useAppStore((s) => s.toggleLastMile);
+  const toggleRoadRoutes = useAppStore((s) => s.toggleRoadRoutes);
+  const toggleRoadPistes = useAppStore((s) => s.toggleRoadPistes);
+  const toggleRoadVoies = useAppStore((s) => s.toggleRoadVoies);
   const toggleLayerVisibility = useMapStore((s) => s.toggleLayerVisibility);
 
   return (
@@ -392,6 +406,21 @@ function MapLegend({ customLayers }: { customLayers: { id: string; name: string;
             <div style={{ width: 22, height: 0, borderTop: '3px dashed #888', flexShrink: 0 }} />
             <span>Dernier km</span>
             <span className="legend-eye">{showLastMile ? <EyeOpen /> : <EyeClosed />}</span>
+          </div>
+          <div className={`map-legend-item toggleable ${showRoadRoutes ? '' : 'hidden-layer'}`} onClick={toggleRoadRoutes}>
+            <div style={{ width: 22, height: 0, borderTop: '2.5px solid #ff6b6b', flexShrink: 0 }} />
+            <span>Routes</span>
+            <span className="legend-eye">{showRoadRoutes ? <EyeOpen /> : <EyeClosed />}</span>
+          </div>
+          <div className={`map-legend-item toggleable ${showRoadPistes ? '' : 'hidden-layer'}`} onClick={toggleRoadPistes}>
+            <div style={{ width: 22, height: 0, borderTop: '2px solid #fbbf24', flexShrink: 0 }} />
+            <span>Pistes</span>
+            <span className="legend-eye">{showRoadPistes ? <EyeOpen /> : <EyeClosed />}</span>
+          </div>
+          <div className={`map-legend-item toggleable ${showRoadVoies ? '' : 'hidden-layer'}`} onClick={toggleRoadVoies}>
+            <div style={{ width: 22, height: 0, borderTop: '2px solid #8b5cf6', flexShrink: 0 }} />
+            <span>Voies</span>
+            <span className="legend-eye">{showRoadVoies ? <EyeOpen /> : <EyeClosed />}</span>
           </div>
           {customLayers.length > 0 && <div className="map-legend-sep" />}
           {customLayers.map((l) => (
@@ -456,13 +485,62 @@ export function MapView() {
   const showLastMile = useAppStore((s) => s.showLastMile);
   const clusteringEnabled = useAppStore((s) => s.clusteringEnabled);
   const { startPoint, endPoint, route, multiPointRoute, transportMode, multiPointTransport, followGps, setFollowGps } = useNavigationStore();
-  const showRoadNetwork = useAppStore((s) => s.showRoadNetwork);
+  const showRoadRoutes = useAppStore((s) => s.showRoadRoutes);
+  const showRoadPistes = useAppStore((s) => s.showRoadPistes);
+  const showRoadVoies = useAppStore((s) => s.showRoadVoies);
   const tile = TILE_URLS[basemap];
   const [userPos, setUserPos] = useState<[number, number] | null>(null);
   const [gpsLoading, setGpsLoading] = useState(false);
   const [measuring, setMeasuring] = useState(false);
   const [measurePoints, setMeasurePoints] = useState<[number, number][]>([]);
   const [mouseCoords, setMouseCoords] = useState<[number, number] | null>(null);
+  const [clusteredPlacetteIds, setClusteredPlacetteIds] = useState<Set<string>>(new Set());
+  const [rotationEnabled, setRotationEnabled] = useState(false);
+  const [compassHeading, setCompassHeading] = useState(0);
+
+  // When clustering is turned off, clear the set so all repères become visible again
+  useEffect(() => {
+    if (!clusteringEnabled) setClusteredPlacetteIds(new Set());
+  }, [clusteringEnabled]);
+
+  // Device orientation → compass heading
+  useEffect(() => {
+    if (!rotationEnabled) { setCompassHeading(0); return; }
+
+    const getHeading = (e: DeviceOrientationEvent): number => {
+      const ios = (e as any).webkitCompassHeading;
+      if (ios != null) return ios; // iOS: clockwise from north, 0-360
+      return e.alpha != null ? (360 - e.alpha) % 360 : 0; // Android absolute
+    };
+    const handler = (e: DeviceOrientationEvent) => setCompassHeading(getHeading(e));
+
+    const listen = () => {
+      window.addEventListener('deviceorientationabsolute', handler as EventListener, true);
+      window.addEventListener('deviceorientation', handler as EventListener);
+    };
+
+    if (typeof (DeviceOrientationEvent as any).requestPermission === 'function') {
+      (DeviceOrientationEvent as any).requestPermission()
+        .then((perm: string) => { if (perm === 'granted') listen(); })
+        .catch(() => {});
+    } else {
+      listen();
+    }
+
+    return () => {
+      window.removeEventListener('deviceorientationabsolute', handler as EventListener, true);
+      window.removeEventListener('deviceorientation', handler as EventListener);
+    };
+  }, [rotationEnabled]);
+
+  // Apply CSS rotation to Leaflet map container
+  useEffect(() => {
+    const container = document.querySelector('.leaflet-container') as HTMLElement | null;
+    if (!container) return;
+    container.style.transition = 'transform 0.2s ease';
+    container.style.transformOrigin = 'center center';
+    container.style.transform = compassHeading ? `rotate(${-compassHeading}deg)` : '';
+  }, [compassHeading]);
 
   useEffect(() => { (window as any).__geonav_measuring = measuring; }, [measuring]);
 
@@ -630,7 +708,7 @@ export function MapView() {
 
         {/* Placettes — clustered or individual */}
         {showPlacettes && clusteringEnabled && !isNavigating && !isMultiNavigating && (
-          <ClusterLayer placettes={visiblePlacettes} getIconFn={getIcon} />
+          <ClusterLayer placettes={visiblePlacettes} getIconFn={getIcon} onClusteredIds={setClusteredPlacetteIds} />
         )}
         {showPlacettes && (!clusteringEnabled || isNavigating || isMultiNavigating) && visiblePlacettes.map((p) => (
           <Marker key={p.id} position={[p.lat, p.lng]} icon={getIcon(p.id)}>
@@ -640,7 +718,9 @@ export function MapView() {
           </Marker>
         ))}
 
-        {/* Repères — only during non-navigation or for concerned placettes */}
+        {/* Repères — follow their parent placette visibility:
+            - During navigation: only repères of visible (navigated) placettes
+            - Normal mode: hide repères whose parent is swallowed into a cluster bubble */}
         {showReperes && (isNavigating || isMultiNavigating
           ? visiblePlacettes.filter((p) => p.repere).map((p) => (
               <Marker key={`rep-${p.id}`} position={[p.repere!.lat, p.repere!.lng]} icon={icons.repere}>
@@ -649,13 +729,15 @@ export function MapView() {
                 </Popup>
               </Marker>
             ))
-          : placettes.filter((p) => p.repere).map((p) => (
-              <Marker key={`rep-${p.id}`} position={[p.repere!.lat, p.repere!.lng]} icon={icons.repere}>
-                <Popup maxWidth={320} minWidth={240}>
-                  <div dangerouslySetInnerHTML={{ __html: buildReperePopup(p) }} />
-                </Popup>
-              </Marker>
-            ))
+          : placettes
+              .filter((p) => p.repere && !clusteredPlacetteIds.has(p.id))
+              .map((p) => (
+                <Marker key={`rep-${p.id}`} position={[p.repere!.lat, p.repere!.lng]} icon={icons.repere}>
+                  <Popup maxWidth={320} minWidth={240}>
+                    <div dangerouslySetInnerHTML={{ __html: buildReperePopup(p) }} />
+                  </Popup>
+                </Marker>
+              ))
         )}
 
         {/* Start/End markers */}
@@ -703,19 +785,21 @@ export function MapView() {
           </>
         )}
 
-        {/* Road network layer (from ROADS_GEOJSON) */}
-        {showRoadNetwork && (window as any).ROADS_GEOJSON && (
-          <GeoJSON
-            key="road-network"
-            data={(window as any).ROADS_GEOJSON}
-            style={(feature: any) => {
-              const type = feature?.properties?.t;
-              if (type === 'R') return { color: '#ff6b6b', weight: 3, opacity: 0.8 };
-              if (type === 'P') return { color: '#fbbf24', weight: 2, opacity: 0.6 };
-              if (type === 'V') return { color: '#8b5cf6', weight: 2, opacity: 0.7 };
-              return { color: '#888', weight: 1, opacity: 0.5 };
-            }}
-          />
+        {/* Road network layers — each type controlled independently */}
+        {showRoadRoutes && (window as any).ROADS_GEOJSON && (
+          <GeoJSON key="road-R" data={(window as any).ROADS_GEOJSON}
+            filter={(f: any) => f?.properties?.t === 'R'}
+            style={() => ({ color: '#ff6b6b', weight: 3, opacity: 0.8 })} />
+        )}
+        {showRoadPistes && (window as any).ROADS_GEOJSON && (
+          <GeoJSON key="road-P" data={(window as any).ROADS_GEOJSON}
+            filter={(f: any) => f?.properties?.t === 'P'}
+            style={() => ({ color: '#fbbf24', weight: 2, opacity: 0.6 })} />
+        )}
+        {showRoadVoies && (window as any).ROADS_GEOJSON && (
+          <GeoJSON key="road-V" data={(window as any).ROADS_GEOJSON}
+            filter={(f: any) => f?.properties?.t === 'V'}
+            style={() => ({ color: '#8b5cf6', weight: 2, opacity: 0.7 })} />
         )}
 
         {/* Custom layers */}
@@ -772,6 +856,26 @@ export function MapView() {
 
       {/* Map controls */}
       <div className="map-controls">
+        {/* Compass rotation toggle */}
+        <button
+          className={`map-btn ${rotationEnabled ? 'active' : ''}`}
+          onClick={async () => {
+            if (!rotationEnabled && typeof (DeviceOrientationEvent as any).requestPermission === 'function') {
+              try {
+                const perm = await (DeviceOrientationEvent as any).requestPermission();
+                if (perm !== 'granted') { alert('Permission compas refusée. Autorisez l\'accès dans les réglages.'); return; }
+              } catch { return; }
+            }
+            setRotationEnabled((v) => !v);
+          }}
+          title={rotationEnabled ? 'Désactiver rotation carte' : 'Orienter la carte selon le compas'}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="9"/>
+            <polygon points="12,4 10,12 12,10 14,12" fill={rotationEnabled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.5"/>
+            <polygon points="12,20 10,12 12,14 14,12" fill="currentColor" opacity="0.35" strokeWidth="1.5"/>
+          </svg>
+        </button>
         {/* Follow GPS — only when route is active */}
         {(isNavigating || isMultiNavigating) && (
           <button
@@ -819,12 +923,14 @@ export function MapView() {
 
       {/* ===== TOP-RIGHT WIDGETS: NORTH ARROW + LEGEND + BASEMAP ===== */}
       <div style={{ position: 'absolute', top: 20, right: 20, zIndex: 1000, display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
-        {/* North arrow */}
-        <div style={{ width: 42, height: 42, background: 'var(--bg-card)', backdropFilter: 'blur(20px)', border: '1px solid var(--border)', borderRadius: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1 }} title="Nord">
-          <svg width="14" height="18" viewBox="0 0 14 18" fill="none">
-            <polygon points="7,0 0,18 7,13 14,18" fill="white" />
-          </svg>
-          <span style={{ fontSize: '9px', fontWeight: 700, color: 'white', lineHeight: 1, letterSpacing: '0.5px' }}>N</span>
+        {/* North arrow — rotates to always point north when map rotates */}
+        <div style={{ width: 42, height: 42, background: 'var(--bg-card)', backdropFilter: 'blur(20px)', border: '1px solid var(--border)', borderRadius: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1, overflow: 'hidden' }} title={rotationEnabled ? `Cap: ${Math.round(compassHeading)}°` : 'Nord'}>
+          <div style={{ transform: `rotate(${-compassHeading}deg)`, transition: 'transform 0.2s ease', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+            <svg width="14" height="18" viewBox="0 0 14 18" fill="none">
+              <polygon points="7,0 0,18 7,13 14,18" fill="white" />
+            </svg>
+            <span style={{ fontSize: '9px', fontWeight: 700, color: 'white', lineHeight: 1, letterSpacing: '0.5px' }}>N</span>
+          </div>
         </div>
         <MapLegend customLayers={customLayers} />
         <MapBasemapSwitcher basemap={basemap} />
