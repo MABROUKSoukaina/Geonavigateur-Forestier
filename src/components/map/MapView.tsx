@@ -495,7 +495,6 @@ export function MapView() {
   const [measurePoints, setMeasurePoints] = useState<[number, number][]>([]);
   const [mouseCoords, setMouseCoords] = useState<[number, number] | null>(null);
   const [clusteredPlacetteIds, setClusteredPlacetteIds] = useState<Set<string>>(new Set());
-  const [rotationEnabled, setRotationEnabled] = useState(false);
   const [compassHeading, setCompassHeading] = useState(0);
   const compassHeadingRef = useRef(0);
   useEffect(() => { compassHeadingRef.current = compassHeading; }, [compassHeading]);
@@ -504,52 +503,6 @@ export function MapView() {
   useEffect(() => {
     if (!clusteringEnabled) setClusteredPlacetteIds(new Set());
   }, [clusteringEnabled]);
-
-  // Device orientation → compass heading
-  useEffect(() => {
-    if (!rotationEnabled) { setCompassHeading(0); return; }
-
-    // Track whether we're already receiving absolute data so the relative
-    // deviceorientation fallback doesn't overwrite it with a wrong heading.
-    let usingAbsolute = false;
-
-    // Handler for deviceorientationabsolute (Chrome Android 65+, most modern browsers)
-    const absoluteHandler = (e: DeviceOrientationEvent) => {
-      usingAbsolute = true;
-      const ios = (e as any).webkitCompassHeading; // iOS Safari
-      if (ios != null) { setCompassHeading(ios); return; }
-      if (e.alpha != null) setCompassHeading((360 - e.alpha) % 360);
-    };
-
-    // Fallback: deviceorientation — only use when no absolute event fired yet,
-    // and only when the event itself reports absolute === true (some Android browsers).
-    const relativeHandler = (e: DeviceOrientationEvent) => {
-      if (usingAbsolute) return;
-      const ios = (e as any).webkitCompassHeading;
-      if (ios != null) { setCompassHeading(ios); return; }
-      if ((e as any).absolute === true && e.alpha != null) {
-        setCompassHeading((360 - e.alpha) % 360);
-      }
-    };
-
-    const listen = () => {
-      window.addEventListener('deviceorientationabsolute', absoluteHandler as EventListener, true);
-      window.addEventListener('deviceorientation', relativeHandler as EventListener);
-    };
-
-    if (typeof (DeviceOrientationEvent as any).requestPermission === 'function') {
-      (DeviceOrientationEvent as any).requestPermission()
-        .then((perm: string) => { if (perm === 'granted') listen(); })
-        .catch(() => {});
-    } else {
-      listen();
-    }
-
-    return () => {
-      window.removeEventListener('deviceorientationabsolute', absoluteHandler as EventListener, true);
-      window.removeEventListener('deviceorientation', relativeHandler as EventListener);
-    };
-  }, [rotationEnabled]);
 
   // Apply CSS rotation to Leaflet map container
   useEffect(() => {
@@ -925,26 +878,6 @@ export function MapView() {
 
       {/* Map controls */}
       <div className="map-controls">
-        {/* Compass rotation toggle */}
-        <button
-          className={`map-btn ${rotationEnabled ? 'active' : ''}`}
-          onClick={async () => {
-            if (!rotationEnabled && typeof (DeviceOrientationEvent as any).requestPermission === 'function') {
-              try {
-                const perm = await (DeviceOrientationEvent as any).requestPermission();
-                if (perm !== 'granted') { alert('Permission compas refusée. Autorisez l\'accès dans les réglages.'); return; }
-              } catch { return; }
-            }
-            setRotationEnabled((v) => !v);
-          }}
-          title={rotationEnabled ? 'Désactiver rotation carte' : 'Orienter la carte selon le compas'}
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="9"/>
-            <polygon points="12,4 10,12 12,10 14,12" fill={rotationEnabled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.5"/>
-            <polygon points="12,20 10,12 12,14 14,12" fill="currentColor" opacity="0.35" strokeWidth="1.5"/>
-          </svg>
-        </button>
         {/* Follow GPS — only when route is active */}
         {(isNavigating || isMultiNavigating) && (
           <button
@@ -994,8 +927,8 @@ export function MapView() {
       <div style={{ position: 'absolute', top: 20, right: 20, zIndex: 1000, display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
         {/* North arrow — tap to reset north; shows current bearing when rotated */}
         <div
-          onClick={() => { if (!rotationEnabled) setCompassHeading(0); }}
-          style={{ width: 42, height: 42, background: 'var(--bg-card)', backdropFilter: 'blur(20px)', border: '1px solid var(--border)', borderRadius: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1, overflow: 'hidden', cursor: compassHeading !== 0 && !rotationEnabled ? 'pointer' : 'default' }}
+          onClick={() => setCompassHeading(0)}
+          style={{ width: 42, height: 42, background: 'var(--bg-card)', backdropFilter: 'blur(20px)', border: '1px solid var(--border)', borderRadius: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1, overflow: 'hidden', cursor: compassHeading !== 0 ? 'pointer' : 'default' }}
           title={compassHeading !== 0 ? `Cap: ${Math.round(compassHeading)}° — Toucher pour réorienter` : 'Nord'}
         >
           <div style={{ transform: `rotate(${-compassHeading}deg)`, transition: 'transform 0.2s ease', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
