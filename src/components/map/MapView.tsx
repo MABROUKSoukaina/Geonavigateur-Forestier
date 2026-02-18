@@ -513,43 +513,51 @@ export function MapView() {
     container.style.transform = compassHeading ? `rotate(${-compassHeading}deg)` : '';
   }, [compassHeading]);
 
-  // Two-finger rotation gesture on the map container
+  // Two-finger rotation — only engages after a clear twist (≥15°),
+  // so normal pinch-zoom and two-finger pan work as usual.
   useEffect(() => {
-    // Wait one frame so MapContainer is in the DOM
     const raf = requestAnimationFrame(() => {
       const el = document.querySelector('.leaflet-container') as HTMLElement | null;
       if (!el) return;
 
       let startAngle: number | null = null;
       let startHeading = 0;
+      let rotationEngaged = false;
+      const THRESHOLD = 15; // degrees before rotation locks in
 
-      const getTouchAngle = (t: TouchList) =>
+      const getAngle = (t: TouchList) =>
         Math.atan2(t[1].clientY - t[0].clientY, t[1].clientX - t[0].clientX) * (180 / Math.PI);
 
       const onStart = (e: TouchEvent) => {
         if (e.touches.length === 2) {
-          startAngle = getTouchAngle(e.touches);
+          startAngle = getAngle(e.touches);
           startHeading = compassHeadingRef.current;
+          rotationEngaged = false;
         }
       };
 
       const onMove = (e: TouchEvent) => {
         if (e.touches.length !== 2 || startAngle === null) return;
-        const delta = getTouchAngle(e.touches) - startAngle;
-        if (Math.abs(delta) > 2) {
-          setCompassHeading(((startHeading - delta) + 360) % 360);
-          e.preventDefault(); // prevent default pinch-zoom during rotation
+        const delta = getAngle(e.touches) - startAngle;
+
+        if (!rotationEngaged && Math.abs(delta) >= THRESHOLD) {
+          rotationEngaged = true;
         }
+
+        if (rotationEngaged) {
+          setCompassHeading(((startHeading - delta) + 360) % 360);
+          e.preventDefault(); // block zoom only once rotation is engaged
+        }
+        // Below threshold: Leaflet handles pinch-zoom & pan normally
       };
 
-      const onEnd = () => { startAngle = null; };
+      const onEnd = () => { startAngle = null; rotationEngaged = false; };
 
       el.addEventListener('touchstart', onStart, { passive: true });
       el.addEventListener('touchmove', onMove, { passive: false });
       el.addEventListener('touchend', onEnd);
       el.addEventListener('touchcancel', onEnd);
 
-      // Store cleanup on the element to call it on unmount
       (el as any).__rotateCleanup = () => {
         el.removeEventListener('touchstart', onStart);
         el.removeEventListener('touchmove', onMove);
@@ -562,7 +570,7 @@ export function MapView() {
       const el = document.querySelector('.leaflet-container') as any;
       el?.__rotateCleanup?.();
     };
-  }, []); // runs once after mount
+  }, []);
 
   useEffect(() => { (window as any).__geonav_measuring = measuring; }, [measuring]);
 
