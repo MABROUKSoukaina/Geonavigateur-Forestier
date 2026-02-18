@@ -497,6 +497,8 @@ export function MapView() {
   const [clusteredPlacetteIds, setClusteredPlacetteIds] = useState<Set<string>>(new Set());
   const [rotationEnabled, setRotationEnabled] = useState(false);
   const [compassHeading, setCompassHeading] = useState(0);
+  const compassHeadingRef = useRef(0);
+  useEffect(() => { compassHeadingRef.current = compassHeading; }, [compassHeading]);
 
   // When clustering is turned off, clear the set so all repères become visible again
   useEffect(() => {
@@ -507,16 +509,32 @@ export function MapView() {
   useEffect(() => {
     if (!rotationEnabled) { setCompassHeading(0); return; }
 
-    const getHeading = (e: DeviceOrientationEvent): number => {
-      const ios = (e as any).webkitCompassHeading;
-      if (ios != null) return ios; // iOS: clockwise from north, 0-360
-      return e.alpha != null ? (360 - e.alpha) % 360 : 0; // Android absolute
+    // Track whether we're already receiving absolute data so the relative
+    // deviceorientation fallback doesn't overwrite it with a wrong heading.
+    let usingAbsolute = false;
+
+    // Handler for deviceorientationabsolute (Chrome Android 65+, most modern browsers)
+    const absoluteHandler = (e: DeviceOrientationEvent) => {
+      usingAbsolute = true;
+      const ios = (e as any).webkitCompassHeading; // iOS Safari
+      if (ios != null) { setCompassHeading(ios); return; }
+      if (e.alpha != null) setCompassHeading((360 - e.alpha) % 360);
     };
-    const handler = (e: DeviceOrientationEvent) => setCompassHeading(getHeading(e));
+
+    // Fallback: deviceorientation — only use when no absolute event fired yet,
+    // and only when the event itself reports absolute === true (some Android browsers).
+    const relativeHandler = (e: DeviceOrientationEvent) => {
+      if (usingAbsolute) return;
+      const ios = (e as any).webkitCompassHeading;
+      if (ios != null) { setCompassHeading(ios); return; }
+      if ((e as any).absolute === true && e.alpha != null) {
+        setCompassHeading((360 - e.alpha) % 360);
+      }
+    };
 
     const listen = () => {
-      window.addEventListener('deviceorientationabsolute', handler as EventListener, true);
-      window.addEventListener('deviceorientation', handler as EventListener);
+      window.addEventListener('deviceorientationabsolute', absoluteHandler as EventListener, true);
+      window.addEventListener('deviceorientation', relativeHandler as EventListener);
     };
 
     if (typeof (DeviceOrientationEvent as any).requestPermission === 'function') {
@@ -528,8 +546,8 @@ export function MapView() {
     }
 
     return () => {
-      window.removeEventListener('deviceorientationabsolute', handler as EventListener, true);
-      window.removeEventListener('deviceorientation', handler as EventListener);
+      window.removeEventListener('deviceorientationabsolute', absoluteHandler as EventListener, true);
+      window.removeEventListener('deviceorientation', relativeHandler as EventListener);
     };
   }, [rotationEnabled]);
 
@@ -541,6 +559,57 @@ export function MapView() {
     container.style.transformOrigin = 'center center';
     container.style.transform = compassHeading ? `rotate(${-compassHeading}deg)` : '';
   }, [compassHeading]);
+
+  // Two-finger rotation gesture on the map container
+  useEffect(() => {
+    // Wait one frame so MapContainer is in the DOM
+    const raf = requestAnimationFrame(() => {
+      const el = document.querySelector('.leaflet-container') as HTMLElement | null;
+      if (!el) return;
+
+      let startAngle: number | null = null;
+      let startHeading = 0;
+
+      const getTouchAngle = (t: TouchList) =>
+        Math.atan2(t[1].clientY - t[0].clientY, t[1].clientX - t[0].clientX) * (180 / Math.PI);
+
+      const onStart = (e: TouchEvent) => {
+        if (e.touches.length === 2) {
+          startAngle = getTouchAngle(e.touches);
+          startHeading = compassHeadingRef.current;
+        }
+      };
+
+      const onMove = (e: TouchEvent) => {
+        if (e.touches.length !== 2 || startAngle === null) return;
+        const delta = getTouchAngle(e.touches) - startAngle;
+        if (Math.abs(delta) > 2) {
+          setCompassHeading(((startHeading - delta) + 360) % 360);
+          e.preventDefault(); // prevent default pinch-zoom during rotation
+        }
+      };
+
+      const onEnd = () => { startAngle = null; };
+
+      el.addEventListener('touchstart', onStart, { passive: true });
+      el.addEventListener('touchmove', onMove, { passive: false });
+      el.addEventListener('touchend', onEnd);
+      el.addEventListener('touchcancel', onEnd);
+
+      // Store cleanup on the element to call it on unmount
+      (el as any).__rotateCleanup = () => {
+        el.removeEventListener('touchstart', onStart);
+        el.removeEventListener('touchmove', onMove);
+        el.removeEventListener('touchend', onEnd);
+        el.removeEventListener('touchcancel', onEnd);
+      };
+    });
+    return () => {
+      cancelAnimationFrame(raf);
+      const el = document.querySelector('.leaflet-container') as any;
+      el?.__rotateCleanup?.();
+    };
+  }, []); // runs once after mount
 
   useEffect(() => { (window as any).__geonav_measuring = measuring; }, [measuring]);
 
@@ -923,8 +992,12 @@ export function MapView() {
 
       {/* ===== TOP-RIGHT WIDGETS: NORTH ARROW + LEGEND + BASEMAP ===== */}
       <div style={{ position: 'absolute', top: 20, right: 20, zIndex: 1000, display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
-        {/* North arrow — rotates to always point north when map rotates */}
-        <div style={{ width: 42, height: 42, background: 'var(--bg-card)', backdropFilter: 'blur(20px)', border: '1px solid var(--border)', borderRadius: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1, overflow: 'hidden' }} title={rotationEnabled ? `Cap: ${Math.round(compassHeading)}°` : 'Nord'}>
+        {/* North arrow — tap to reset north; shows current bearing when rotated */}
+        <div
+          onClick={() => { if (!rotationEnabled) setCompassHeading(0); }}
+          style={{ width: 42, height: 42, background: 'var(--bg-card)', backdropFilter: 'blur(20px)', border: '1px solid var(--border)', borderRadius: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1, overflow: 'hidden', cursor: compassHeading !== 0 && !rotationEnabled ? 'pointer' : 'default' }}
+          title={compassHeading !== 0 ? `Cap: ${Math.round(compassHeading)}° — Toucher pour réorienter` : 'Nord'}
+        >
           <div style={{ transform: `rotate(${-compassHeading}deg)`, transition: 'transform 0.2s ease', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
             <svg width="14" height="18" viewBox="0 0 14 18" fill="none">
               <polygon points="7,0 0,18 7,13 14,18" fill="white" />

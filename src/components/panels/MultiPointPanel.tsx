@@ -207,7 +207,18 @@ export function MultiPointPanel() {
       {/* Actions */}
       <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
         <button className="btn btn-primary" style={{ flex: 1 }} disabled={selectedPlacettesData.length < 2 || nav.isCalculating} onClick={handleCalculate}>
-          {nav.isCalculating ? <span className="gps-loading">Calcul en cours...</span> : '🚀 Optimiser le parcours'}
+          {nav.isCalculating ? (
+            <span className="gps-loading">Calcul en cours...</span>
+          ) : (
+            <>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '7px', flexShrink: 0 }}>
+                <circle cx="6" cy="19" r="3"/>
+                <path d="M9 19h8.5a3.5 3.5 0 000-7h-11a3.5 3.5 0 010-7H15"/>
+                <circle cx="18" cy="5" r="3"/>
+              </svg>
+              Optimiser le parcours
+            </>
+          )}
         </button>
         <button className="btn btn-danger" style={{ flex: 0, padding: '14px 20px' }} onClick={() => { nav.clearMultiPointPlacettes(); setRouteSource(''); }}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
