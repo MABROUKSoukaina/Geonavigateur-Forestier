@@ -41,7 +41,7 @@ function AutocompleteInput({ value, onChange, placeholder, items }: {
   );
 }
 
-function PointCard({ title, iconClass, iconSvg, type, setType, selectedCode, onSelectPlacette, placetteItems, repereItems, onGps, onCarte, point }: any) {
+function PointCard({ title, iconClass, iconSvg, type, setType, selectedCode, onSelectPlacette, placetteItems, repereItems, onGps, onCarte, point, onClear }: any) {
   return (
     <div className="nav-card">
       <div className="nav-card-header">
@@ -64,7 +64,17 @@ function PointCard({ title, iconClass, iconSvg, type, setType, selectedCode, onS
         {type === 'placette' && <AutocompleteInput value={selectedCode} onChange={onSelectPlacette} placeholder="Tapez un code de placette..." items={placetteItems} />}
         {type === 'repere' && <AutocompleteInput value={selectedCode} onChange={onSelectPlacette} placeholder="Tapez un code de repère..." items={repereItems} />}
 
-        {point && <div className="nav-status" style={{ marginTop: '8px' }}><span className="status-icon">✓</span><span>{point.label}</span></div>}
+        {point && (
+          <div className="nav-status" style={{ marginTop: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+              <span className="status-icon">✓</span>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{point.label}</span>
+            </div>
+            <button onClick={onClear} title="Effacer" style={{ flexShrink: 0, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-muted)', marginLeft: '8px' }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -170,7 +180,8 @@ export function NavigationPanel() {
             type={startType} setType={setStartType} selectedCode={startCode}
             onSelectPlacette={(c: string) => handleSelectPlacette(c, true)}
             placetteItems={placetteItems} repereItems={repereItems}
-            onGps={() => handleGps(true)} onCarte={() => setClickMode('setStart')} point={nav.startPoint} />
+            onGps={() => handleGps(true)} onCarte={() => setClickMode('setStart')} point={nav.startPoint}
+            onClear={() => { nav.setStartPoint(null); setStartCode(''); }} />
 
           <div className="nav-direction-arrow">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14m-7-7l7 7 7-7"/></svg>
@@ -182,7 +193,8 @@ export function NavigationPanel() {
               type={endType} setType={setEndType} selectedCode={endCode}
               onSelectPlacette={(c: string) => handleSelectPlacette(c, false)}
               placetteItems={placetteItems} repereItems={repereItems}
-              onGps={() => handleGps(false)} onCarte={() => setClickMode('setEnd')} point={nav.endPoint} />
+              onGps={() => handleGps(false)} onCarte={() => setClickMode('setEnd')} point={nav.endPoint}
+              onClear={() => { nav.setEndPoint(null); setEndCode(''); }} />
           </div>
 
           {/* Transport */}

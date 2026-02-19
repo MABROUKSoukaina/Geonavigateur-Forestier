@@ -495,82 +495,10 @@ export function MapView() {
   const [measurePoints, setMeasurePoints] = useState<[number, number][]>([]);
   const [mouseCoords, setMouseCoords] = useState<[number, number] | null>(null);
   const [clusteredPlacetteIds, setClusteredPlacetteIds] = useState<Set<string>>(new Set());
-  const [compassHeading, setCompassHeading] = useState(0);
-  const compassHeadingRef = useRef(0);
-  useEffect(() => { compassHeadingRef.current = compassHeading; }, [compassHeading]);
-
   // When clustering is turned off, clear the set so all repères become visible again
   useEffect(() => {
     if (!clusteringEnabled) setClusteredPlacetteIds(new Set());
   }, [clusteringEnabled]);
-
-  // Apply CSS rotation to Leaflet map container
-  useEffect(() => {
-    const container = document.querySelector('.leaflet-container') as HTMLElement | null;
-    if (!container) return;
-    container.style.transition = 'transform 0.2s ease';
-    container.style.transformOrigin = 'center center';
-    container.style.transform = compassHeading ? `rotate(${-compassHeading}deg)` : '';
-  }, [compassHeading]);
-
-  // Two-finger rotation — only engages after a clear twist (≥15°),
-  // so normal pinch-zoom and two-finger pan work as usual.
-  useEffect(() => {
-    const raf = requestAnimationFrame(() => {
-      const el = document.querySelector('.leaflet-container') as HTMLElement | null;
-      if (!el) return;
-
-      let startAngle: number | null = null;
-      let startHeading = 0;
-      let rotationEngaged = false;
-      const THRESHOLD = 15; // degrees before rotation locks in
-
-      const getAngle = (t: TouchList) =>
-        Math.atan2(t[1].clientY - t[0].clientY, t[1].clientX - t[0].clientX) * (180 / Math.PI);
-
-      const onStart = (e: TouchEvent) => {
-        if (e.touches.length === 2) {
-          startAngle = getAngle(e.touches);
-          startHeading = compassHeadingRef.current;
-          rotationEngaged = false;
-        }
-      };
-
-      const onMove = (e: TouchEvent) => {
-        if (e.touches.length !== 2 || startAngle === null) return;
-        const delta = getAngle(e.touches) - startAngle;
-
-        if (!rotationEngaged && Math.abs(delta) >= THRESHOLD) {
-          rotationEngaged = true;
-        }
-
-        if (rotationEngaged) {
-          setCompassHeading(((startHeading - delta) + 360) % 360);
-          e.preventDefault(); // block zoom only once rotation is engaged
-        }
-        // Below threshold: Leaflet handles pinch-zoom & pan normally
-      };
-
-      const onEnd = () => { startAngle = null; rotationEngaged = false; };
-
-      el.addEventListener('touchstart', onStart, { passive: true });
-      el.addEventListener('touchmove', onMove, { passive: false });
-      el.addEventListener('touchend', onEnd);
-      el.addEventListener('touchcancel', onEnd);
-
-      (el as any).__rotateCleanup = () => {
-        el.removeEventListener('touchstart', onStart);
-        el.removeEventListener('touchmove', onMove);
-        el.removeEventListener('touchend', onEnd);
-        el.removeEventListener('touchcancel', onEnd);
-      };
-    });
-    return () => {
-      cancelAnimationFrame(raf);
-      const el = document.querySelector('.leaflet-container') as any;
-      el?.__rotateCleanup?.();
-    };
-  }, []);
 
   useEffect(() => { (window as any).__geonav_measuring = measuring; }, [measuring]);
 
@@ -933,18 +861,12 @@ export function MapView() {
 
       {/* ===== TOP-RIGHT WIDGETS: NORTH ARROW + LEGEND + BASEMAP ===== */}
       <div style={{ position: 'absolute', top: 20, right: 20, zIndex: 1000, display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
-        {/* North arrow — tap to reset north; shows current bearing when rotated */}
-        <div
-          onClick={() => setCompassHeading(0)}
-          style={{ width: 42, height: 42, background: 'var(--bg-card)', backdropFilter: 'blur(20px)', border: '1px solid var(--border)', borderRadius: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1, overflow: 'hidden', cursor: compassHeading !== 0 ? 'pointer' : 'default' }}
-          title={compassHeading !== 0 ? `Cap: ${Math.round(compassHeading)}° — Toucher pour réorienter` : 'Nord'}
-        >
-          <div style={{ transform: `rotate(${-compassHeading}deg)`, transition: 'transform 0.2s ease', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-            <svg width="14" height="18" viewBox="0 0 14 18" fill="none">
-              <polygon points="7,0 0,18 7,13 14,18" fill="white" />
-            </svg>
-            <span style={{ fontSize: '9px', fontWeight: 700, color: 'white', lineHeight: 1, letterSpacing: '0.5px' }}>N</span>
-          </div>
+        {/* North arrow — static indicator */}
+        <div style={{ width: 42, height: 42, background: 'var(--bg-card)', backdropFilter: 'blur(20px)', border: '1px solid var(--border)', borderRadius: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1 }} title="Nord">
+          <svg width="14" height="18" viewBox="0 0 14 18" fill="none">
+            <polygon points="7,0 0,18 7,13 14,18" fill="white" />
+          </svg>
+          <span style={{ fontSize: '9px', fontWeight: 700, color: 'white', lineHeight: 1, letterSpacing: '0.5px' }}>N</span>
         </div>
         <MapLegend customLayers={customLayers} />
         <MapBasemapSwitcher basemap={basemap} />
