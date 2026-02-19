@@ -628,7 +628,7 @@ export function MapView() {
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative', cursor: (clickMode !== 'none' || measuring) ? 'crosshair' : undefined }}>
-      <MapContainer center={DEFAULT_CENTER} zoom={DEFAULT_ZOOM} style={{ width: '100%', height: '100%' }} zoomControl={false}>
+      <MapContainer center={DEFAULT_CENTER} zoom={DEFAULT_ZOOM} style={{ width: '100%', height: '100%' }} zoomControl={false} tap={false} bounceAtZoomLimits={false}>
         <TileLayer url={tile.url} attribution={tile.attribution} maxZoom={tile.maxZoom} />
         <MapClickHandler />
         <MapSync />
@@ -766,7 +766,7 @@ export function MapView() {
 
       {/* Click mode overlay */}
       {clickMode !== 'none' && (
-        <div style={{ position: 'absolute', top: 20, left: '50%', transform: 'translateX(-50%)', zIndex: 1000, background: 'var(--bg-card)', backdropFilter: 'blur(20px)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 20px', fontSize: '0.85rem', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ position: 'absolute', top: 20, left: '50%', transform: 'translateX(-50%)', zIndex: 1000, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 20px', fontSize: '0.85rem', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: 10 }}>
           📍 {clickMode === 'setStart' ? 'Cliquez pour le départ' : clickMode === 'setEnd' ? "Cliquez pour l'arrivée" : 'Cliquez sur les placettes'}
           <button onClick={() => useMapStore.getState().setClickMode('none')} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1rem' }}>✕</button>
         </div>
@@ -774,7 +774,7 @@ export function MapView() {
 
       {/* Measurement banner */}
       {measuring && (
-        <div style={{ position: 'absolute', top: 20, left: '50%', transform: 'translateX(-50%)', zIndex: 1000, background: 'var(--bg-card)', backdropFilter: 'blur(20px)', border: '1px solid var(--accent)', borderRadius: 10, padding: '10px 20px', fontSize: '0.85rem', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ position: 'absolute', top: 20, left: '50%', transform: 'translateX(-50%)', zIndex: 1000, background: 'var(--bg-card)', border: '1px solid var(--accent)', borderRadius: 10, padding: '10px 20px', fontSize: '0.85rem', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: 12 }}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="8" width="20" height="8" rx="2"/><line x1="6" y1="8" x2="6" y2="12"/><line x1="10" y1="8" x2="10" y2="14"/><line x1="14" y1="8" x2="14" y2="12"/><line x1="18" y1="8" x2="18" y2="14"/></svg>
           {measurePoints.length === 0 ? 'Cliquez pour commencer la mesure' : `Total : ${fmtDist(calcTotalDist(measurePoints))}`}
           {measurePoints.length > 0 && (
@@ -862,7 +862,7 @@ export function MapView() {
       {/* ===== TOP-RIGHT WIDGETS: NORTH ARROW + LEGEND + BASEMAP ===== */}
       <div style={{ position: 'absolute', top: 20, right: 20, zIndex: 1000, display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
         {/* North arrow — static indicator */}
-        <div style={{ width: 42, height: 42, background: 'var(--bg-card)', backdropFilter: 'blur(20px)', border: '1px solid var(--border)', borderRadius: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1 }} title="Nord">
+        <div style={{ width: 42, height: 42, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1 }} title="Nord">
           <svg width="14" height="18" viewBox="0 0 14 18" fill="none">
             <polygon points="7,0 0,18 7,13 14,18" fill="white" />
           </svg>
