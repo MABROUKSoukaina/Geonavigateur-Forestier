@@ -12,7 +12,9 @@ const TABS: { key: TabType; label: string }[] = [
   { key: 'layers', label: 'Couches' },
 ];
 
-export function Sidebar() {
+interface SidebarProps { onShowDashboard: () => void; }
+
+export function Sidebar({ onShowDashboard }: SidebarProps) {
   const { routingMode, setRoutingMode, activeTab, setActiveTab,
     showRoadRoutes, showRoadPistes, showRoadVoies,
     toggleRoadRoutes, toggleRoadPistes, toggleRoadVoies } = useAppStore();
@@ -29,17 +31,35 @@ export function Sidebar() {
   return (
     <>
       {/* Header */}
-      <div className="panel-header">
-        <div className="logo">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
-            <circle cx="12" cy="10" r="3"/>
+      <div className="panel-header" style={{ justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div className="logo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+              <circle cx="12" cy="10" r="3"/>
+            </svg>
+          </div>
+          <div className="panel-title">
+            <h1>GeoNav Pro</h1>
+            <span>Placettes Forestières RSK</span>
+          </div>
+        </div>
+        <button
+          onClick={onShowDashboard}
+          title="Tableau de bord IFN"
+          style={{
+            display: 'flex', alignItems: 'center', gap: 5,
+            padding: '5px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600,
+            color: 'var(--accent)', background: 'rgba(0,212,170,0.08)',
+            border: '1px solid rgba(0,212,170,0.25)', cursor: 'pointer',
+            whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.2s',
+          }}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M3 3v18h18"/><path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"/>
           </svg>
-        </div>
-        <div className="panel-title">
-          <h1>GeoNav Pro</h1>
-          <span>Placettes Forestières RSK</span>
-        </div>
+          Stats
+        </button>
       </div>
 
       {/* Global Routing Toggle */}

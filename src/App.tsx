@@ -1,17 +1,19 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Sidebar } from './components/layout/Sidebar';
 import { MapView } from './components/map/MapView';
+import { Dashboard } from './components/dashboard/Dashboard';
 import { useAppStore } from './stores/useAppStore';
 import { useDataStore } from './stores/useDataStore';
-import { DEFAULT_PLACETTES } from './services/defaultData';
 import { initOfflineRouter } from './services/offlineRouter';
 
 export default function App() {
   const sidebarOpen = useAppStore((s) => s.sidebarOpen);
+  const { loadFromApi, error } = useDataStore();
+  const [showDashboard, setShowDashboard] = useState(false);
 
-  // Load default data, init offline router, register store globally
+  // Load placettes from backend API, init offline router, register store globally
   useEffect(() => {
-    useDataStore.getState().setPlacettes(DEFAULT_PLACETTES);
+    loadFromApi();
     (window as any).__useAppStore = useAppStore;
 
     // Try to init offline router (loads from window.ROAD_GRAPH)
@@ -25,9 +27,23 @@ export default function App() {
 
   return (
     <div className="app-layout">
+      {/* Dashboard — rendered at root level so it sits above the Leaflet map */}
+      {showDashboard && <Dashboard onClose={() => setShowDashboard(false)} />}
+
+      {/* API error banner */}
+      {error && (
+        <div style={{
+          position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)',
+          zIndex: 2000, background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.4)',
+          color: '#fca5a5', fontSize: 12, padding: '6px 16px', borderRadius: 8, backdropFilter: 'blur(4px)',
+        }}>
+          Impossible de contacter le serveur : {error}
+        </div>
+      )}
+
       {/* Side panel */}
       <div className={`side-panel ${sidebarOpen ? '' : 'collapsed'}`}>
-        <Sidebar />
+        <Sidebar onShowDashboard={() => setShowDashboard(true)} />
       </div>
 
       {/* Toggle button */}
