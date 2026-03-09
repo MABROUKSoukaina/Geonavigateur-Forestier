@@ -78,6 +78,7 @@ public class IfnProgrammeController {
     public ResponseEntity<Map<String, Object>> getGeoJson(
             @RequestParam(required = false) String dpanef,
             @RequestParam(required = false) String dranef,
+            @RequestParam(required = false) String equipe,
             @RequestParam(required = false) String strate,
             @RequestParam(required = false) String essence) {
 
@@ -85,6 +86,7 @@ public class IfnProgrammeController {
 
         if (dpanef != null)       placettes = service.findByDpanef(dpanef);
         else if (dranef != null)  placettes = service.findByDranef(dranef);
+        else if (equipe != null)  placettes = service.findByEquipe(equipe);
         else if (strate != null)  placettes = service.findByStrate(strate);
         else if (essence != null) placettes = service.findByEssence(essence);
         else                      placettes = service.findAll();

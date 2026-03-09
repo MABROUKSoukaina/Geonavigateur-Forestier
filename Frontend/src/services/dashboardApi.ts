@@ -1,4 +1,83 @@
-const BASE_URL = 'http://localhost:8080/api/dashboard';
+const BACKEND = 'https://fstg2pxb-8080.uks1.devtunnels.ms';
+const BASE_URL = `${BACKEND}/api/dashboard`;
+const PLACETTES_BASE = `${BACKEND}/api/placettes`;
+
+// ─── GeoJSON types ────────────────────────────────────────────────────────────
+
+export interface GeoJsonFeature {
+  type: 'Feature';
+  geometry: { type: 'Point'; coordinates: [number, number] };
+  properties: {
+    numPlacette: string;
+    equipe: string | null;
+    strateCartographique: string | null;
+    altitude: number | null;
+    pente: number | null;
+    exposition: number | null;
+    dpanef: string | null;
+    dranef: string | null;
+    xRepere: number | null;
+    yRepere: number | null;
+    distanceRepere: number | null;
+    azimutRepere: number | null;
+    descriptionRepere: string | null;
+    observations: string | null;
+  };
+}
+
+export interface GeoJsonCollection {
+  type: 'FeatureCollection';
+  totalFeatures: number;
+  features: GeoJsonFeature[];
+}
+
+export async function fetchPlacettesGeoJson(
+  filters: { equipe?: string; strate?: string } = {}
+): Promise<GeoJsonCollection> {
+  const params = new URLSearchParams();
+  if (filters.equipe) params.set('equipe', filters.equipe);
+  if (filters.strate) params.set('strate', filters.strate);
+  const qs = params.toString();
+  const url = `${PLACETTES_BASE}/geojson${qs ? '?' + qs : ''}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`GeoJSON → ${res.status}`);
+  return res.json();
+}
+
+// ─── Map GeoJSON types (dashboard/map — joins ifn_programme + plot) ───────────
+
+export interface MapFeature {
+  type: 'Feature';
+  geometry: { type: 'Point'; coordinates: [number, number] };
+  properties: {
+    num_placette: string;
+    equipe: string | null;
+    strate: string | null;
+    dpanef: string | null;
+    altitude: number | null;
+    pente: number | null;
+    x_repere: number | null;
+    y_repere: number | null;
+    description_repere: string | null;
+    distance_repere: number | null;
+    azimut_repere: number | null;
+    statut: 'visitee' | 'programmee' | 'controle';
+    accessibilite: number | null;
+    a_pied: number | null;
+  };
+}
+
+export interface MapCollection {
+  type: 'FeatureCollection';
+  totalFeatures: number;
+  features: MapFeature[];
+}
+
+export async function fetchMapGeoJson(): Promise<MapCollection> {
+  const res = await fetch(`${BASE_URL}/map`);
+  if (!res.ok) throw new Error(`Map GeoJSON → ${res.status}`);
+  return res.json();
+}
 
 // ─── Response types (matching the SQL views) ─────────────────────────────────
 
@@ -9,6 +88,7 @@ export interface KpiGlobal {
   pct_avancement: number;
   nb_jours_terrain: number;
   moy_par_jour: number;
+  nb_controle: number;
 }
 
 export interface AvancementEquipe {
@@ -30,18 +110,23 @@ export interface AvancementStrate {
 export interface AccessibiliteGlobal {
   total_visitees: number;
   nb_accessible: number;
-  nb_a_pied: number;
   pct_accessible: number;
-  pct_a_pied: number;
+  /** plot_accessibility_a_pied = 0 → < 100 m */
+  nb_a_pied_0: number;
+  /** plot_accessibility_a_pied = 1 → 100–500 m */
+  nb_a_pied_1: number;
+  /** plot_accessibility_a_pied = 2 → > 500 m */
+  nb_a_pied_2: number;
 }
 
 export interface AccessibiliteEquipe {
   equipe: string;
   total_visite: number;
   nb_accessible: number;
-  nb_a_pied: number;
   pct_accessible: number;
-  pct_a_pied: number;
+  nb_a_pied_0: number;
+  nb_a_pied_1: number;
+  nb_a_pied_2: number;
 }
 
 export interface VisiteParJour {

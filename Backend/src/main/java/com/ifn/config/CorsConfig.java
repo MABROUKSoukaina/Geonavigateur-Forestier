@@ -10,8 +10,8 @@ public class CorsConfig implements WebMvcConfigurer {
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/api/**")
-                // Vite dev server (geonav-pro)
-                .allowedOriginPatterns("http://localhost:*")
+                // Vite dev server (local) + VS Code dev tunnel (shared)
+                .allowedOriginPatterns("http://localhost:*", "https://*.devtunnels.ms")
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                 .allowedHeaders("*")
                 .allowCredentials(false)
