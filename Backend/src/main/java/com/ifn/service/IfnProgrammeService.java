@@ -41,7 +41,7 @@ public class IfnProgrammeService {
     }
 
     public List<IfnProgramme> findByEssence(String essence) {
-        return repository.findByEssenceGroup(essence);
+        return repository.findByEssenceAbr(essence);
     }
 
     public long count() {
@@ -66,6 +66,7 @@ public class IfnProgrammeService {
                     properties.put("exposition", p.getExposition());
                     properties.put("strateCartographique", p.getStrateCartographique());
                     properties.put("essenceGroup", p.getEssenceGroup());
+                    properties.put("essenceAbr", p.getEssenceAbr());
                     properties.put("dranef", p.getDranef());
                     properties.put("dpanef", p.getDpanef());
                     properties.put("equipe", p.getEquipe());

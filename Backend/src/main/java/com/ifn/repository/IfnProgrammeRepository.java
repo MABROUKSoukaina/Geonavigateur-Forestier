@@ -20,4 +20,6 @@ public interface IfnProgrammeRepository
     List<IfnProgramme> findByStrateCartographique(String strateCartographique);
 
     List<IfnProgramme> findByEssenceGroup(String essenceGroup);
+
+    List<IfnProgramme> findByEssenceAbr(String essenceAbr);
 }

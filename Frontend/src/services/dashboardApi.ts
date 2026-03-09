@@ -53,6 +53,7 @@ export interface MapFeature {
     num_placette: string;
     equipe: string | null;
     strate: string | null;
+    essence_group: string | null;
     dpanef: string | null;
     altitude: number | null;
     pente: number | null;
@@ -107,6 +108,11 @@ export interface AvancementStrate {
   pct_avancement: number;
 }
 
+export interface AvancementEssence {
+  essence: string;
+  total_visite: number;
+}
+
 export interface AccessibiliteGlobal {
   total_visitees: number;
   nb_accessible: number;
@@ -156,6 +162,7 @@ export interface DashboardData {
   kpi: KpiGlobal;
   equipes: AvancementEquipe[];
   strates: AvancementStrate[];
+  essences: AvancementEssence[];
   accessibilite: {
     global: AccessibiliteGlobal;
     equipes: AccessibiliteEquipe[];
@@ -174,12 +181,13 @@ async function get<T>(path: string): Promise<T> {
 }
 
 export async function fetchDashboardData(): Promise<DashboardData> {
-  const [kpi, equipes, strates, accessibilite, temporel] = await Promise.all([
+  const [kpi, equipes, strates, essences, accessibilite, temporel] = await Promise.all([
     get<KpiGlobal>('/kpi'),
     get<AvancementEquipe[]>('/equipes'),
     get<AvancementStrate[]>('/strates'),
+    get<AvancementEssence[]>('/essences'),
     get<{ global: AccessibiliteGlobal; equipes: AccessibiliteEquipe[] }>('/accessibilite'),
     get<{ visitesParJour: VisiteParJour[]; moyParJourEquipe: MoyJourEquipe[]; productivite: ProductiviteEquipe[] }>('/temporel'),
   ]);
-  return { kpi, equipes, strates, accessibilite, temporel };
+  return { kpi, equipes, strates, essences, accessibilite, temporel };
 }

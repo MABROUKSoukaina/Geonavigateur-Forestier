@@ -10,10 +10,10 @@ import { fetchMapGeoJson, type MapFeature } from '../../services/dashboardApi';
 
 const EQUIPE_COLORS = ['#818cf8', '#4ade80', '#f59e0b', '#ef4444', '#38bdf8', '#c084fc'];
 
-const STRATE_PALETTE = [
+const ESSENCE_PALETTE = [
   '#0ea5e9', '#8b5cf6', '#f97316', '#10b981', '#ec4899',
   '#eab308', '#06b6d4', '#84cc16', '#f43f5e', '#a78bfa',
-  '#fb923c', '#34d399', '#60a5fa', '#f472b6', '#a3e635',
+  '#fb923c',
 ];
 
 const BASEMAPS = [
@@ -31,12 +31,12 @@ const STATUT_ITEMS = [
   { key: 'controle',   label: 'Placette contrôle',          color: '#8b5cf6' },
 ] as const;
 
-type ClassifyMode = 'statut' | 'equipe' | 'strate';
+type ClassifyMode = 'statut' | 'equipe' | 'essence';
 
 const MODE_LABELS: Record<ClassifyMode, string> = {
   statut: 'Par statut (réalisé / non réalisé)',
   equipe: 'Par équipe',
-  strate: 'Par strate',
+  essence: 'Par essence',
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -51,9 +51,9 @@ function equipeShort(name: string): string {
   return m ? m[1] : name;
 }
 
-function markerColor(f: MapFeature, mode: ClassifyMode, strateColors: Map<string, string>): string {
-  if (mode === 'equipe') return f.properties.equipe ? EQUIPE_COLORS[equipeIndex(f.properties.equipe)] : '#94a3b8';
-  if (mode === 'strate') return (f.properties.strate && strateColors.get(f.properties.strate)) || '#94a3b8';
+function markerColor(f: MapFeature, mode: ClassifyMode, essenceColors: Map<string, string>): string {
+  if (mode === 'equipe')  return f.properties.equipe ? EQUIPE_COLORS[equipeIndex(f.properties.equipe)] : '#94a3b8';
+  if (mode === 'essence') return (f.properties.essence_group && essenceColors.get(f.properties.essence_group)) || '#94a3b8';
   if (f.properties.statut === 'visitee')  return '#10b981';
   if (f.properties.statut === 'controle') return '#8b5cf6';
   return '#94a3b8';
@@ -138,9 +138,9 @@ export function TabCarte({ data }: Props) {
 
   const [classifyMode, setClassifyMode] = useState<ClassifyMode>('statut');
   const [selEquipes,   setSelEquipes]   = useState<Set<string>>(new Set());
-  const [selStrates,   setSelStrates]   = useState<Set<string>>(new Set());
+  const [selEssences,  setSelEssences]  = useState<Set<string>>(new Set());
   const [selStatuts,   setSelStatuts]   = useState<Set<string>>(new Set());
-  const [openPanel,    setOpenPanel]    = useState<'classifier' | 'statuts' | 'equipes' | 'strates' | null>(null);
+  const [openPanel,    setOpenPanel]    = useState<'classifier' | 'statuts' | 'equipes' | 'essences' | null>(null);
   const [legendOpen,   setLegendOpen]   = useState(true);
   const [basemap,      setBasemap]      = useState<BasemapId>('carto-light');
   const [basemapOpen,  setBasemapOpen]  = useState(false);
@@ -165,36 +165,36 @@ export function TabCarte({ data }: Props) {
   }, []);
 
   // Derived lists and color map
-  const equipeList  = data.equipes.map(e => e.equipe);
-  const strateList  = data.strates.map(s => s.strate);
-  const strateColors = new Map(strateList.map((s, i) => [s, STRATE_PALETTE[i % STRATE_PALETTE.length]]));
+  const equipeList   = data.equipes.map(e => e.equipe);
+  const essenceList  = [...new Set(allFeatures.map(f => f.properties.essence_group).filter(Boolean) as string[])].sort();
+  const essenceColors = new Map(essenceList.map((s, i) => [s, ESSENCE_PALETTE[i % ESSENCE_PALETTE.length]]));
 
   // Filtered features (multi-criteria AND)
   const filtered = allFeatures
     .filter(f => selStatuts.size === 0 || selStatuts.has(f.properties.statut))
     .filter(f => selEquipes.size === 0 || (f.properties.equipe != null && selEquipes.has(f.properties.equipe)))
-    .filter(f => selStrates.size === 0 || (f.properties.strate != null && selStrates.has(f.properties.strate)));
+    .filter(f => selEssences.size === 0 || (f.properties.essence_group != null && selEssences.has(f.properties.essence_group)));
 
-  const hasFilters = selStatuts.size > 0 || selEquipes.size > 0 || selStrates.size > 0;
+  const hasFilters = selStatuts.size > 0 || selEquipes.size > 0 || selEssences.size > 0;
 
   // Context-aware counts: each dropdown shows counts filtered by the OTHER active filter
   const equipeCtxMap = new Map<string, number>();
   allFeatures
-    .filter(f => selStrates.size === 0 || (f.properties.strate != null && selStrates.has(f.properties.strate)))
+    .filter(f => selEssences.size === 0 || (f.properties.essence_group != null && selEssences.has(f.properties.essence_group)))
     .forEach(f => {
       if (f.properties.equipe)
         equipeCtxMap.set(f.properties.equipe, (equipeCtxMap.get(f.properties.equipe) ?? 0) + 1);
     });
 
-  const strateCtxMap = new Map<string, number>();
+  const essenceCtxMap = new Map<string, number>();
   allFeatures
     .filter(f => selEquipes.size === 0 || (f.properties.equipe != null && selEquipes.has(f.properties.equipe)))
     .forEach(f => {
-      if (f.properties.strate)
-        strateCtxMap.set(f.properties.strate, (strateCtxMap.get(f.properties.strate) ?? 0) + 1);
+      if (f.properties.essence_group)
+        essenceCtxMap.set(f.properties.essence_group, (essenceCtxMap.get(f.properties.essence_group) ?? 0) + 1);
     });
 
-  function togglePanel(p: 'classifier' | 'statuts' | 'equipes' | 'strates'): void {
+  function togglePanel(p: 'classifier' | 'statuts' | 'equipes' | 'essences'): void {
     setOpenPanel(prev => prev === p ? null : p);
   }
 
@@ -214,8 +214,8 @@ export function TabCarte({ data }: Props) {
     });
   }
 
-  function toggleStrate(s: string) {
-    setSelStrates(prev => {
+  function toggleEssence(s: string) {
+    setSelEssences(prev => {
       const next = new Set(prev);
       if (next.has(s)) next.delete(s); else next.add(s);
       return next;
@@ -245,7 +245,7 @@ export function TabCarte({ data }: Props) {
             <DropPanel>
               <p style={SECTION_LABEL}>Symbologie</p>
 
-              {(['statut', 'equipe', 'strate'] as ClassifyMode[]).map(m => (
+              {(['statut', 'equipe', 'essence'] as ClassifyMode[]).map(m => (
                 <label key={m} style={{
                   display: 'flex', alignItems: 'center', gap: 8,
                   padding: '5px 0', cursor: 'pointer', fontSize: 12, color: '#334155',
@@ -395,32 +395,32 @@ export function TabCarte({ data }: Props) {
           )}
         </div>
 
-        {/* ── Filtrer par strate ─────────────────────────────────────────── */}
+        {/* ── Filtrer par essence ─────────────────────────────────────────── */}
         <div style={{ position: 'relative' }}>
           <FilterBtn
-            label="Strates"
-            active={openPanel === 'strates' || selStrates.size > 0}
-            badge={selStrates.size || undefined}
-            onClick={() => togglePanel('strates')}
+            label="Essences"
+            active={openPanel === 'essences' || selEssences.size > 0}
+            badge={selEssences.size || undefined}
+            onClick={() => togglePanel('essences')}
           />
-          {openPanel === 'strates' && (
+          {openPanel === 'essences' && (
             <DropPanel style={{ maxHeight: 380, overflowY: 'auto' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                <p style={{ ...SECTION_LABEL, marginBottom: 0 }}>Filtrer par strate</p>
-                <button style={miniBtn} onClick={() => setSelStrates(selStrates.size > 0 ? new Set() : new Set(strateList))}>
-                  {selStrates.size > 0 ? 'Effacer' : 'Tout'}
+                <p style={{ ...SECTION_LABEL, marginBottom: 0 }}>Filtrer par essence</p>
+                <button style={miniBtn} onClick={() => setSelEssences(selEssences.size > 0 ? new Set() : new Set(essenceList))}>
+                  {selEssences.size > 0 ? 'Effacer' : 'Tout'}
                 </button>
               </div>
 
-              {strateList.map(s => {
-                const color = strateColors.get(s) ?? '#94a3b8';
-                const count = strateCtxMap.get(s) ?? 0;
+              {essenceList.map(s => {
+                const color = essenceColors.get(s) ?? '#94a3b8';
+                const count = essenceCtxMap.get(s) ?? 0;
                 return (
                   <label key={s} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 0', cursor: 'pointer' }}>
                     <Checkbox
                       size="small"
-                      checked={selStrates.has(s)}
-                      onChange={() => toggleStrate(s)}
+                      checked={selEssences.has(s)}
+                      onChange={() => toggleEssence(s)}
                       sx={{ p: 0.3, color: '#cbd5e1', '&.Mui-checked': { color } }}
                     />
                     <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, display: 'inline-block', flexShrink: 0 }} />
@@ -430,9 +430,9 @@ export function TabCarte({ data }: Props) {
                 );
               })}
 
-              {selStrates.size > 0 && (
+              {selEssences.size > 0 && (
                 <p style={{ fontSize: 10, color: '#94a3b8', marginTop: 8, textAlign: 'center' }}>
-                  {selStrates.size} strate{selStrates.size > 1 ? 's' : ''} sélectionnée{selStrates.size > 1 ? 's' : ''}
+                  {selEssences.size} essence{selEssences.size > 1 ? 's' : ''} sélectionnée{selEssences.size > 1 ? 's' : ''}
                 </p>
               )}
             </DropPanel>
@@ -452,7 +452,7 @@ export function TabCarte({ data }: Props) {
         {/* Reset */}
         {hasFilters && (
           <button
-            onClick={() => { setSelStatuts(new Set()); setSelEquipes(new Set()); setSelStrates(new Set()); }}
+            onClick={() => { setSelStatuts(new Set()); setSelEquipes(new Set()); setSelEssences(new Set()); }}
             style={{
               background: 'none', border: '1px solid #fca5a5', borderRadius: 7,
               padding: '4px 10px', cursor: 'pointer', fontSize: 11,
@@ -532,9 +532,9 @@ export function TabCarte({ data }: Props) {
                   </div>
                 ))}
 
-                {classifyMode === 'strate' && strateList.map(s => (
+                {classifyMode === 'essence' && essenceList.map(s => (
                   <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 5 }}>
-                    <span style={{ width: 9, height: 9, borderRadius: '50%', background: strateColors.get(s) ?? '#94a3b8', flexShrink: 0, display: 'inline-block' }} />
+                    <span style={{ width: 9, height: 9, borderRadius: '50%', background: essenceColors.get(s) ?? '#94a3b8', flexShrink: 0, display: 'inline-block' }} />
                     <span style={{ fontSize: 11, color: '#334155' }}>{s}</span>
                   </div>
                 ))}
@@ -581,7 +581,7 @@ export function TabCarte({ data }: Props) {
 
           {filtered.map(f => {
             const [lon, lat] = f.geometry.coordinates;
-            const color      = markerColor(f, classifyMode, strateColors);
+            const color      = markerColor(f, classifyMode, essenceColors);
             const statut     = f.properties.statut;
             const isVisitee  = statut === 'visitee';
             const isControle = statut === 'controle';
@@ -626,9 +626,9 @@ export function TabCarte({ data }: Props) {
                         <span style={{ color: '#94a3b8' }}>Équipe</span>
                         <span style={{ color: '#1e293b', fontWeight: 600 }}>{equipeShort(f.properties.equipe)}</span>
                       </>}
-                      {f.properties.strate && <>
-                        <span style={{ color: '#94a3b8' }}>Strate</span>
-                        <span style={{ color: '#1e293b', fontWeight: 600 }}>{f.properties.strate}</span>
+                      {f.properties.essence_group && <>
+                        <span style={{ color: '#94a3b8' }}>Essence</span>
+                        <span style={{ color: '#1e293b', fontWeight: 600 }}>{f.properties.essence_group}</span>
                       </>}
                       {f.properties.dpanef && <>
                         <span style={{ color: '#94a3b8' }}>DPANEF</span>

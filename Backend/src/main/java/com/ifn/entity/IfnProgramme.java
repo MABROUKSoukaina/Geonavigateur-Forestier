@@ -76,4 +76,7 @@ public class IfnProgramme {
 
     @Column(name = "observations", columnDefinition = "text")
     private String observations;
+
+    @Column(name = "essence_abr", length = 20)
+    private String essenceAbr;
 }

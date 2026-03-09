@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import type {
-  DashboardData, AvancementEquipe, AvancementStrate, AccessibiliteEquipe, ProductiviteEquipe,
+  DashboardData, AvancementEquipe, AvancementEssence, AccessibiliteEquipe, ProductiviteEquipe,
 } from '../../services/dashboardApi';
 import { fetchDashboardData } from '../../services/dashboardApi';
 import { TabCarte } from './TabCarte';
@@ -9,7 +9,7 @@ import { TabCarte } from './TabCarte';
 
 const EQUIPE_COLORS = ['#818cf8', '#4ade80', '#f59e0b', '#ef4444', '#38bdf8', '#c084fc'];
 const BAR_COLORS    = ['#4ade80', '#38bdf8', '#f59e0b', '#c084fc', '#ef4444', '#fb923c'];
-const STRATE_COLORS = [
+const ESSENCE_COLORS = [
   '#0ea5e9', '#8b5cf6', '#f97316', '#10b981', '#ec4899',
   '#eab308', '#06b6d4', '#84cc16', '#f43f5e', '#a78bfa',
   '#fb923c', '#34d399', '#60a5fa', '#f472b6', '#a3e635',
@@ -217,31 +217,31 @@ function DonutChart({ equipes }: { equipes: AvancementEquipe[] }) {
   );
 }
 
-// ─── Donut chart — strate distribution ───────────────────────────────────────
+// ─── Donut chart — essence distribution ──────────────────────────────────────
 
-function StrateDonutChart({ strates }: { strates: AvancementStrate[] }) {
+function EssenceDonutChart({ essences }: { essences: AvancementEssence[] }) {
   const [hovered, setHovered] = useState<number | null>(null);
-  const sorted = [...strates].sort((a, b) => b.total_programme - a.total_programme);
+  const sorted = [...essences].sort((a, b) => b.total_visite - a.total_visite);
   const size = 180, cx = size / 2, cy = size / 2, outerR = 74, innerR = 46;
-  const total = sorted.reduce((s, st) => s + st.total_programme, 0);
+  const total = sorted.reduce((s, e) => s + e.total_visite, 0);
   if (total === 0) return null;
 
   let angle = -Math.PI / 2;
-  const slices = sorted.map((st, i) => {
-    const sweep = (st.total_programme / total) * 2 * Math.PI;
+  const slices = sorted.map((ess, i) => {
+    const sweep = (ess.total_visite / total) * 2 * Math.PI;
     const mid = angle + sweep / 2;
     const a0 = angle, a1 = angle + sweep;
     angle = a1;
-    const color = STRATE_COLORS[i % STRATE_COLORS.length];
-    const pct   = (st.total_programme / total) * 100;
-    if (sweep >= 2 * Math.PI - 0.001) return { st, color, pct, mid, isCircle: true, d: '' };
+    const color = ESSENCE_COLORS[i % ESSENCE_COLORS.length];
+    const pct   = (ess.total_visite / total) * 100;
+    if (sweep >= 2 * Math.PI - 0.001) return { ess, color, pct, mid, isCircle: true, d: '' };
     const large = sweep > Math.PI ? 1 : 0;
     const ox0 = cx + outerR * Math.cos(a0), oy0 = cy + outerR * Math.sin(a0);
     const ox1 = cx + outerR * Math.cos(a1), oy1 = cy + outerR * Math.sin(a1);
     const ix0 = cx + innerR * Math.cos(a0), iy0 = cy + innerR * Math.sin(a0);
     const ix1 = cx + innerR * Math.cos(a1), iy1 = cy + innerR * Math.sin(a1);
     const d = `M ${ix0} ${iy0} L ${ox0} ${oy0} A ${outerR} ${outerR} 0 ${large} 1 ${ox1} ${oy1} L ${ix1} ${iy1} A ${innerR} ${innerR} 0 ${large} 0 ${ix0} ${iy0} Z`;
-    return { st, color, pct, mid, isCircle: false, d };
+    return { ess, color, pct, mid, isCircle: false, d };
   });
 
   const hov = hovered !== null ? slices[hovered] : null;
@@ -280,13 +280,13 @@ function StrateDonutChart({ strates }: { strates: AvancementStrate[] }) {
         <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
           {hov ? (
             <>
-              <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 15, color: hov.color }}>{hov.st.total_programme}</span>
+              <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 15, color: hov.color }}>{hov.ess.total_visite}</span>
               <span style={{ fontSize: 9, color: hov.color, opacity: 0.8, marginTop: 1 }}>{hov.pct.toFixed(1)}%</span>
             </>
           ) : (
             <>
               <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 20, color: '#1e293b' }}>{total.toLocaleString()}</span>
-              <span style={{ fontSize: 10, color: '#94a3b8', marginTop: 1 }}>placettes</span>
+              <span style={{ fontSize: 10, color: '#94a3b8', marginTop: 1 }}>visitées</span>
             </>
           )}
         </div>
@@ -296,7 +296,7 @@ function StrateDonutChart({ strates }: { strates: AvancementStrate[] }) {
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 14px', justifyContent: 'center', width: '100%', maxHeight: 120, overflowY: 'auto', scrollbarWidth: 'thin' }}>
         {slices.map((s, i) => (
           <div
-            key={s.st.strate}
+            key={s.ess.essence}
             style={{
               display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer',
               opacity: hovered !== null && hovered !== i ? 0.4 : 1,
@@ -306,10 +306,7 @@ function StrateDonutChart({ strates }: { strates: AvancementStrate[] }) {
             onMouseLeave={() => setHovered(null)}
           >
             <div style={{ width: 9, height: 9, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
-            <span style={{ fontSize: 11, color: '#334155' }}>{s.st.strate}</span>
-            {s.st.total_visite > 0 && (
-              <span style={{ fontSize: 9, color: '#059669', fontWeight: 700 }}>✓{s.st.total_visite}</span>
-            )}
+            <span style={{ fontSize: 11, color: '#334155' }}>{s.ess.essence}</span>
             <span style={{ fontFamily: 'monospace', fontSize: 10, color: '#94a3b8' }}>{s.pct.toFixed(1)}%</span>
           </div>
         ))}
@@ -321,10 +318,9 @@ function StrateDonutChart({ strates }: { strates: AvancementStrate[] }) {
 // ─── Tab panels ───────────────────────────────────────────────────────────────
 
 function TabGlobal({ data }: { data: DashboardData }) {
-  const { kpi, strates } = data;
+  const { kpi, essences } = data;
   const pct = Number(kpi.pct_avancement);
-  const visited = strates.filter(s => s.total_visite > 0);
-  const unvisited = strates.filter(s => s.total_visite === 0);
+  const topEssences = essences.slice(0, 8);
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
@@ -345,21 +341,16 @@ function TabGlobal({ data }: { data: DashboardData }) {
         </div>
       </Card>
 
-      <Card title="Top strates réalisées">
-        {visited.length === 0 ? (
-          <p style={{ color: '#94a3b8', fontSize: 14, textAlign: 'center', padding: '16px 0' }}>Aucune strate réalisée</p>
+      <Card title="Top essences réalisées">
+        {topEssences.length === 0 ? (
+          <p style={{ color: '#94a3b8', fontSize: 14, textAlign: 'center', padding: '16px 0' }}>Aucune essence réalisée</p>
         ) : (
-          visited.map((s, i) => (
-            <BarH key={s.strate}
-              label={s.strate}
-              value={s.total_visite} max={s.total_programme} count={s.total_programme}
+          topEssences.map((e, i) => (
+            <BarH key={e.essence}
+              label={e.essence}
+              value={e.total_visite} max={essences[0]?.total_visite ?? 1}
               color={BAR_COLORS[i % BAR_COLORS.length]} />
           ))
-        )}
-        {unvisited.length > 0 && (
-          <div style={{ ...S.innerCard, fontSize: 12, color: '#64748b', marginTop: 12, border: '1px solid #e2e8f0' }}>
-            {unvisited.length} strate(s) non encore réalisée(s) sur {strates.length}
-          </div>
         )}
       </Card>
     </div>
@@ -413,19 +404,20 @@ function TabEquipe({ data }: { data: DashboardData }) {
   );
 }
 
-function TabStrate({ data }: { data: DashboardData }) {
-  const { strates, kpi } = data;
+function TabEssence({ data }: { data: DashboardData }) {
+  const { essences } = data;
+  const maxVisite = essences[0]?.total_visite ?? 1;
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-      <Card title="Placettes réalisées par strate">
-        {strates.map((s) => (
-          <BarH key={s.strate} label={s.strate}
-            value={s.total_visite} max={s.total_programme} count={s.total_programme}
-            color={s.total_visite > 0 ? '#059669' : 'rgba(0,0,0,0.1)'} />
+      <Card title="Placettes réalisées par essence">
+        {essences.map((e, i) => (
+          <BarH key={e.essence} label={e.essence}
+            value={e.total_visite} max={maxVisite}
+            color={ESSENCE_COLORS[i % ESSENCE_COLORS.length]} />
         ))}
       </Card>
-      <Card title="Distribution du programme par strate">
-        <StrateDonutChart strates={strates} />
+      <Card title="Distribution des essences réalisées">
+        <EssenceDonutChart essences={essences} />
       </Card>
     </div>
   );
@@ -841,7 +833,7 @@ function TabControleQualite({ data }: { data: DashboardData }) {
 const TABS = [
   { id: 'global',   label: 'Vue globale' },
   { id: 'equipe',   label: 'Par équipe' },
-  { id: 'strate',   label: 'Par strate' },
+  { id: 'essence',  label: 'Par essence' },
   { id: 'temporel', label: 'Temporel' },
   { id: 'access',   label: 'Accessibilité' },
   { id: 'controle', label: 'Contrôle Qualité' },
@@ -963,7 +955,7 @@ export function Dashboard({ onClose }: Props) {
               <>
                 {tab === 'global'   && <TabGlobal data={data} />}
                 {tab === 'equipe'   && <TabEquipe data={data} />}
-                {tab === 'strate'   && <TabStrate data={data} />}
+                {tab === 'essence'  && <TabEssence data={data} />}
                 {tab === 'temporel' && <TabTemporel data={data} />}
                 {tab === 'access'   && <TabAccessibilite data={data} />}
                 {tab === 'controle' && <TabControleQualite data={data} />}

@@ -158,6 +158,23 @@ public class DashboardController {
     }
 
     /**
+     * GET /api/dashboard/essences
+     * Visited plot counts grouped by strate_terrain_essence (field-recorded species code).
+     * Excludes control plots (plot_no LIKE '%C').
+     */
+    @GetMapping("/essences")
+    public ResponseEntity<List<Map<String, Object>>> getEssences() {
+        String sql =
+                "SELECT strate_terrain_essence AS essence, COUNT(*) AS total_visite " +
+                "FROM plot " +
+                "WHERE plot_no NOT LIKE '%C' " +
+                "  AND strate_terrain_essence IS NOT NULL " +
+                "GROUP BY strate_terrain_essence " +
+                "ORDER BY total_visite DESC";
+        return ResponseEntity.ok(jdbc.queryForList(sql));
+    }
+
+    /**
      * GET /api/dashboard/map
      * GeoJSON FeatureCollection joining ifn_programme + plot.
      * Each feature carries statut (visitee/programmee) and accessibility fields.
@@ -167,7 +184,7 @@ public class DashboardController {
         // Two separate joins: regular visit (exact match) + control visit (num_placette + 'C')
         String sql =
                 "SELECT p.num_placette, p.x_centre AS lon, p.y_centre AS lat, " +
-                "p.equipe, p.strate_cartographique AS strate, p.dpanef, " +
+                "p.equipe, p.strate_cartographique AS strate, p.essence_group, p.dpanef, " +
                 "p.altitude, p.pente, p.x_repere, p.y_repere, " +
                 "p.description_repere, p.distance_repere, p.azimut_repere, " +
                 "CASE WHEN ctrl.plot_no IS NOT NULL THEN 'controle' " +
