@@ -11,8 +11,8 @@
   transform: translateZ(0);
   -webkit-transform: translateZ(0);
   will-change: transform;
-  /* Allow pan and pinch-zoom, prevent double-tap zoom */
-  touch-action: pan-x pan-y pinch-zoom;
+  /* Let Leaflet handle all touch gestures (pan + pinch-zoom) */
+  touch-action: none;
   -webkit-tap-highlight-color: transparent;
 }
 /* Remove tap flash on all buttons/interactive elements */

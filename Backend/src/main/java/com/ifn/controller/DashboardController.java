@@ -63,7 +63,9 @@ public class DashboardController {
      */
     @GetMapping("/equipes")
     public ResponseEntity<List<Map<String, Object>>> getEquipes() {
-        return ResponseEntity.ok(jdbc.queryForList("SELECT * FROM v_avancement_equipe ORDER BY pct_avancement DESC"));
+        return ResponseEntity.ok(jdbc.queryForList(
+                "SELECT * FROM v_avancement_equipe " +
+                "ORDER BY CAST(REGEXP_REPLACE(equipe, '.*N°(\\d+).*', '\\1') AS INTEGER)"));
     }
 
     /**
@@ -108,6 +110,7 @@ public class DashboardController {
                 "SELECT " +
                 "  COUNT(*) AS total_visitees, " +
                 "  SUM(CASE WHEN plot_accessibilite        = 1 THEN 1 ELSE 0 END) AS nb_accessible, " +
+                "  SUM(CASE WHEN plot_accessibilite        = 0 THEN 1 ELSE 0 END) AS nb_inaccessible, " +
                 "  SUM(CASE WHEN plot_accessibility_a_pied = 0 THEN 1 ELSE 0 END) AS nb_a_pied_0, " +
                 "  SUM(CASE WHEN plot_accessibility_a_pied = 1 THEN 1 ELSE 0 END) AS nb_a_pied_1, " +
                 "  SUM(CASE WHEN plot_accessibility_a_pied = 2 THEN 1 ELSE 0 END) AS nb_a_pied_2  " +
@@ -124,6 +127,7 @@ public class DashboardController {
                 "SELECT prog.equipe, " +
                 "  COUNT(*) AS total_visite, " +
                 "  SUM(CASE WHEN pl.plot_accessibilite        = 1 THEN 1 ELSE 0 END) AS nb_accessible, " +
+                "  SUM(CASE WHEN pl.plot_accessibilite        = 0 THEN 1 ELSE 0 END) AS nb_inaccessible, " +
                 "  SUM(CASE WHEN pl.plot_accessibility_a_pied = 0 THEN 1 ELSE 0 END) AS nb_a_pied_0, " +
                 "  SUM(CASE WHEN pl.plot_accessibility_a_pied = 1 THEN 1 ELSE 0 END) AS nb_a_pied_1, " +
                 "  SUM(CASE WHEN pl.plot_accessibility_a_pied = 2 THEN 1 ELSE 0 END) AS nb_a_pied_2, " +
@@ -132,7 +136,7 @@ public class DashboardController {
                 "JOIN plot pl ON pl.plot_no = prog.num_placette " +
                 "WHERE pl.plot_no NOT LIKE '%C' " +
                 "GROUP BY prog.equipe " +
-                "ORDER BY total_visite DESC");
+                "ORDER BY CAST(REGEXP_REPLACE(prog.equipe, '.*N°(\\d+).*', '\\1') AS INTEGER)");
 
         return ResponseEntity.ok(Map.of(
                 "global", global,
@@ -149,7 +153,22 @@ public class DashboardController {
     public ResponseEntity<Map<String, Object>> getTemporel() {
         List<Map<String, Object>> parJour    = jdbc.queryForList("SELECT * FROM v_visites_par_jour ORDER BY date_visite");
         List<Map<String, Object>> moyEquipe  = jdbc.queryForList("SELECT * FROM v_moy_jour_equipe ORDER BY date_visite, equipe");
-        List<Map<String, Object>> productivite = jdbc.queryForList("SELECT * FROM v_productivite_equipe ORDER BY moy_par_jour DESC");
+        // Per-team productivity: nb_jours = distinct working days per team (not global)
+        List<Map<String, Object>> productivite = jdbc.queryForList(
+                "SELECT prog.equipe, " +
+                "  COUNT(prog.num_placette)                                                  AS total_affecte, " +
+                "  COUNT(pl.plot_no)                                                         AS total_visite, " +
+                "  COUNT(DISTINCT DATE(pl.date_modified))                                    AS nb_jours, " +
+                "  ROUND(COUNT(pl.plot_no) * 1.0 / " +
+                "        NULLIF(COUNT(DISTINCT DATE(pl.date_modified)), 0), 1)               AS moy_par_jour, " +
+                "  CEIL((COUNT(prog.num_placette) - COUNT(pl.plot_no)) * 1.0 / " +
+                "       NULLIF(ROUND(COUNT(pl.plot_no) * 1.0 / " +
+                "              NULLIF(COUNT(DISTINCT DATE(pl.date_modified)), 0), 1), 0))    AS jours_restants_estimes " +
+                "FROM ifn_programme prog " +
+                "LEFT JOIN plot pl ON pl.plot_no = prog.num_placette AND pl.plot_no NOT LIKE '%C' " +
+                "WHERE prog.equipe IS NOT NULL " +
+                "GROUP BY prog.equipe " +
+                "ORDER BY CAST(REGEXP_REPLACE(prog.equipe, '.*N°(\\d+).*', '\\1') AS INTEGER)");
         return ResponseEntity.ok(Map.of(
                 "visitesParJour", parJour,
                 "moyParJourEquipe", moyEquipe,
@@ -175,6 +194,50 @@ public class DashboardController {
     }
 
     /**
+     * GET /api/dashboard/strates-par-equipe
+     * For each team: how many visited plots per cartographic stratum.
+     * Used to render a stacked bar chart (équipe × strate).
+     */
+    @GetMapping("/strates-par-equipe")
+    public ResponseEntity<List<Map<String, Object>>> getStratesParEquipe() {
+        String sql =
+                "SELECT prog.equipe, " +
+                "  pl.strate_terrain_essence AS essence, " +
+                "  COUNT(pl.plot_no) AS nb_visite " +
+                "FROM ifn_programme prog " +
+                "JOIN plot pl ON pl.plot_no = prog.num_placette " +
+                "  AND pl.plot_no NOT LIKE '%C' " +
+                "WHERE prog.equipe IS NOT NULL " +
+                "  AND pl.strate_terrain_essence IS NOT NULL " +
+                "GROUP BY prog.equipe, pl.strate_terrain_essence " +
+                "ORDER BY CAST(REGEXP_REPLACE(prog.equipe, '.*N°(\\d+).*', '\\1') AS INTEGER), nb_visite DESC";
+        return ResponseEntity.ok(jdbc.queryForList(sql));
+    }
+
+    /**
+     * GET /api/dashboard/groupes
+     * Progress per essence_group: total programmed vs visited + % advancement.
+     * Joins ifn_programme (source of truth for groups) with plot (actual visits).
+     */
+    @GetMapping("/groupes")
+    public ResponseEntity<List<Map<String, Object>>> getGroupes() {
+        String sql =
+                "SELECT " +
+                "  prog.essence_group AS groupe, " +
+                "  COUNT(prog.num_placette)                                                       AS total_programme, " +
+                "  COALESCE(SUM(CASE WHEN pl.plot_no IS NOT NULL THEN 1 ELSE 0 END), 0)           AS total_visite, " +
+                "  ROUND(COALESCE(SUM(CASE WHEN pl.plot_no IS NOT NULL THEN 1 ELSE 0 END), 0) " +
+                "        * 100.0 / NULLIF(COUNT(prog.num_placette), 0), 1)                        AS pct_avancement " +
+                "FROM ifn_programme prog " +
+                "LEFT JOIN plot pl ON pl.plot_no = prog.num_placette " +
+                "                 AND pl.plot_no NOT LIKE '%C' " +
+                "WHERE prog.essence_group IS NOT NULL " +
+                "GROUP BY prog.essence_group " +
+                "ORDER BY total_visite DESC, total_programme DESC";
+        return ResponseEntity.ok(jdbc.queryForList(sql));
+    }
+
+    /**
      * GET /api/dashboard/map
      * GeoJSON FeatureCollection joining ifn_programme + plot.
      * Each feature carries statut (visitee/programmee) and accessibility fields.
@@ -191,7 +254,8 @@ public class DashboardController {
                 "     WHEN reg.plot_no  IS NOT NULL THEN 'visitee' " +
                 "     ELSE 'programmee' END AS statut, " +
                 "COALESCE(reg.plot_accessibilite, ctrl.plot_accessibilite) AS accessibilite, " +
-                "COALESCE(reg.plot_accessibility_a_pied, ctrl.plot_accessibility_a_pied) AS a_pied " +
+                "COALESCE(reg.plot_accessibility_a_pied, ctrl.plot_accessibility_a_pied) AS a_pied, " +
+                "COALESCE(reg.date_modified, ctrl.date_modified) AS date_modified " +
                 "FROM ifn_programme p " +
                 "LEFT JOIN plot reg  ON reg.plot_no  = p.num_placette " +
                 "LEFT JOIN plot ctrl ON ctrl.plot_no = p.num_placette || 'C' " +

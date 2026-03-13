@@ -1,4 +1,4 @@
-const BACKEND = 'https://fstg2pxb-8080.uks1.devtunnels.ms';
+const BACKEND = 'http://localhost:8080';
 const BASE_URL = `${BACKEND}/api/dashboard`;
 const PLACETTES_BASE = `${BACKEND}/api/placettes`;
 
@@ -65,6 +65,7 @@ export interface MapFeature {
     statut: 'visitee' | 'programmee' | 'controle';
     accessibilite: number | null;
     a_pied: number | null;
+    date_modified: string | null;
   };
 }
 
@@ -113,9 +114,23 @@ export interface AvancementEssence {
   total_visite: number;
 }
 
+export interface StrateParEquipe {
+  equipe: string;
+  essence: string;
+  nb_visite: number;
+}
+
+export interface AvancementGroupe {
+  groupe: string;
+  total_programme: number;
+  total_visite: number;
+  pct_avancement: number;
+}
+
 export interface AccessibiliteGlobal {
   total_visitees: number;
   nb_accessible: number;
+  nb_inaccessible: number;
   pct_accessible: number;
   /** plot_accessibility_a_pied = 0 → < 100 m */
   nb_a_pied_0: number;
@@ -129,6 +144,7 @@ export interface AccessibiliteEquipe {
   equipe: string;
   total_visite: number;
   nb_accessible: number;
+  nb_inaccessible: number;
   pct_accessible: number;
   nb_a_pied_0: number;
   nb_a_pied_1: number;
@@ -152,7 +168,7 @@ export interface MoyJourEquipe {
 export interface ProductiviteEquipe {
   equipe: string;
   total_affecte: number;
-  visited: number;
+  total_visite: number;
   nb_jours: number;
   moy_par_jour: number;
   jours_restants_estimes: number | null;
@@ -163,6 +179,8 @@ export interface DashboardData {
   equipes: AvancementEquipe[];
   strates: AvancementStrate[];
   essences: AvancementEssence[];
+  groupes: AvancementGroupe[];
+  stratesParEquipe: StrateParEquipe[];
   accessibilite: {
     global: AccessibiliteGlobal;
     equipes: AccessibiliteEquipe[];
@@ -181,13 +199,15 @@ async function get<T>(path: string): Promise<T> {
 }
 
 export async function fetchDashboardData(): Promise<DashboardData> {
-  const [kpi, equipes, strates, essences, accessibilite, temporel] = await Promise.all([
+  const [kpi, equipes, strates, essences, groupes, stratesParEquipe, accessibilite, temporel] = await Promise.all([
     get<KpiGlobal>('/kpi'),
     get<AvancementEquipe[]>('/equipes'),
     get<AvancementStrate[]>('/strates'),
     get<AvancementEssence[]>('/essences'),
+    get<AvancementGroupe[]>('/groupes'),
+    get<StrateParEquipe[]>('/strates-par-equipe'),
     get<{ global: AccessibiliteGlobal; equipes: AccessibiliteEquipe[] }>('/accessibilite'),
     get<{ visitesParJour: VisiteParJour[]; moyParJourEquipe: MoyJourEquipe[]; productivite: ProductiviteEquipe[] }>('/temporel'),
   ]);
-  return { kpi, equipes, strates, essences, accessibilite, temporel };
+  return { kpi, equipes, strates, essences, groupes, stratesParEquipe, accessibilite, temporel };
 }

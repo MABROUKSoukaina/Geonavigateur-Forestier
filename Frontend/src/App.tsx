@@ -59,7 +59,7 @@ export default function App() {
       </button>
 
       {/* Map fills remaining space */}
-      <div className="map-wrapper" style={{ flex: 1, height: '100%', minWidth: 0 }}>
+      <div className="map-wrapper" style={{ flex: 1, height: '100%', minWidth: 0, touchAction: 'none', overflow: 'hidden' }}>
         <MapView />
       </div>
     </div>

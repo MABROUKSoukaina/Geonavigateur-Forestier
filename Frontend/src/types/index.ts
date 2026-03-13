@@ -46,7 +46,7 @@ export interface MultiPointResult {
 
 export type TransportMode = 'car' | 'walk' | 'bike' | 'fly';
 export type RoutingMode = 'offline' | 'online';
-export type BasemapType = 'google-hybrid' | 'google-sat' | 'google-sat-nolabel' | 'cartodb-dark' | 'osm' | 'topo';
+export type BasemapType = 'google-sat' | 'esri-hybrid' | 'esri-topo' | 'esri-streets';
 export type TabType = 'navigation' | 'placettes' | 'data' | 'layers';
 export type ClickMode = 'none' | 'setStart' | 'setEnd' | 'addMultiPoint';
 

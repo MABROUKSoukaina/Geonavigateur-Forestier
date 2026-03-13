@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import type { ReactNode, CSSProperties } from 'react';
-import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import L from 'leaflet';
 import Checkbox from '@mui/material/Checkbox';
-import Chip from '@mui/material/Chip';
 import type { DashboardData } from '../../services/dashboardApi';
 import { fetchMapGeoJson, type MapFeature } from '../../services/dashboardApi';
 
@@ -17,26 +17,21 @@ const ESSENCE_PALETTE = [
 ];
 
 const BASEMAPS = [
-  { id: 'carto-light',   label: 'Carto Light',      url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',  attribution: '© CARTO',         maxZoom: 19 },
-  { id: 'google-hybrid', label: 'Google Hybrid',    url: 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',              attribution: '© Google',        maxZoom: 20 },
-  { id: 'google-sat',    label: 'Google Satellite', url: 'https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',              attribution: '© Google',        maxZoom: 20 },
-  { id: 'osm',           label: 'OpenStreetMap',    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',               attribution: '© OpenStreetMap', maxZoom: 19 },
-  { id: 'topo',          label: 'Topographie',      url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',                 attribution: '© OpenTopoMap',   maxZoom: 17 },
+  { id: 'google-sat',    label: 'Google Satellite', url: 'https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',                                                                         attribution: '© Google',                                             maxZoom: 20 },
+  { id: 'esri-hybrid',  label: 'Esri Hybrid',      url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',                             attribution: '© Esri, Maxar, Earthstar Geographics',                 maxZoom: 19 },
+  { id: 'esri-topo',    label: 'Esri Topographie', url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',                             attribution: '© Esri, HERE, Garmin, © OpenStreetMap contributors',   maxZoom: 19 },
+  { id: 'esri-streets', label: 'Esri Streets',     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',                          attribution: '© Esri, HERE, Garmin, © OpenStreetMap contributors',   maxZoom: 19 },
 ] as const;
 type BasemapId = typeof BASEMAPS[number]['id'];
 
-const STATUT_ITEMS = [
-  { key: 'programmee', label: 'Non réalisée',               color: '#94a3b8' },
-  { key: 'visitee',    label: 'Réalisée (non contrôlée)',   color: '#10b981' },
-  { key: 'controle',   label: 'Placette contrôle',          color: '#8b5cf6' },
-] as const;
 
-type ClassifyMode = 'statut' | 'equipe' | 'essence';
+type ClassifyMode = 'statut' | 'equipe' | 'essence' | 'accessibilite';
 
 const MODE_LABELS: Record<ClassifyMode, string> = {
-  statut: 'Par statut (réalisé / non réalisé)',
-  equipe: 'Par équipe',
-  essence: 'Par essence',
+  statut:        'Par statut (réalisé / non réalisé)',
+  equipe:        'Par équipe',
+  essence:       'Par essence',
+  accessibilite: 'Par accessibilité',
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -48,12 +43,34 @@ function equipeIndex(name: string): number {
 
 function equipeShort(name: string): string {
   const m = name.match(/Equipe\s+(.+?)\s+\(/);
-  return m ? m[1] : name;
+  const s = m ? m[1] : name;
+  return s.replace(/_\w+$/, '');
 }
+
+// ─── DivIcon factories ────────────────────────────────────────────────────────
+
+function makeMarkerIcon(color: string, highlighted: boolean): L.DivIcon {
+  const dot = highlighted ? 18 : 10;
+  const hit = 28; // large transparent hit area for easy clicking
+  const glow = highlighted ? `0 0 12px ${color},` : '';
+  return L.divIcon({
+    className: '',
+    html: `<div style="width:${hit}px;height:${hit}px;display:flex;align-items:center;justify-content:center;"><div style="width:${dot}px;height:${dot}px;background:${color};border:2.5px solid white;border-radius:50%;box-shadow:${glow}0 2px 6px rgba(0,0,0,0.3);"></div></div>`,
+    iconSize: [hit, hit] as L.PointExpression,
+    iconAnchor: [hit / 2, hit / 2] as L.PointExpression,
+    popupAnchor: [0, -(dot / 2 + 3)] as L.PointExpression,
+  });
+}
+
 
 function markerColor(f: MapFeature, mode: ClassifyMode, essenceColors: Map<string, string>): string {
   if (mode === 'equipe')  return f.properties.equipe ? EQUIPE_COLORS[equipeIndex(f.properties.equipe)] : '#94a3b8';
   if (mode === 'essence') return (f.properties.essence_group && essenceColors.get(f.properties.essence_group)) || '#94a3b8';
+  if (mode === 'accessibilite') {
+    if (f.properties.accessibilite === 1) return '#06b6d4';   // accessible — cyan
+    if (f.properties.accessibilite === 0) return '#ef4444';   // non accessible — red
+    return '#94a3b8';                                          // not visited / unknown
+  }
   if (f.properties.statut === 'visitee')  return '#10b981';
   if (f.properties.statut === 'controle') return '#8b5cf6';
   return '#94a3b8';
@@ -73,6 +90,30 @@ function MapFitter({ features }: { features: MapFeature[] }) {
     );
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [features]);
+  return null;
+}
+
+// ─── MapFlyer — flies to a placette when selected via search ──────────────────
+
+function MapFlyer({ target }: { target: [number, number] | null }) {
+  const map = useMap();
+  useEffect(() => {
+    if (target) map.flyTo(target, 15, { duration: 1.2 });
+  }, [map, target]);
+  return null;
+}
+
+// ─── ResetView — re-runs fitBounds on the same features as MapFitter ─────────
+function ResetView({ trigger, features }: { trigger: number; features: { geometry: { coordinates: number[] } }[] }) {
+  const map = useMap();
+  useEffect(() => {
+    if (trigger > 0 && features.length > 0) {
+      map.fitBounds(
+        features.map(f => [f.geometry.coordinates[1], f.geometry.coordinates[0]] as [number, number]),
+        { padding: [40, 40], maxZoom: 12, animate: true },
+      );
+    }
+  }, [trigger, map]);
   return null;
 }
 
@@ -97,7 +138,7 @@ function FilterBtn({ label, active, badge, onClick }: {
       display: 'flex', alignItems: 'center', gap: 5,
       background: active ? 'rgba(5,150,105,0.08)' : '#f8fafc',
       border: `1px solid ${active ? 'rgba(5,150,105,0.4)' : '#e2e8f0'}`,
-      borderRadius: 8, padding: '5px 12px', cursor: 'pointer',
+      borderRadius: 8, padding: '5px 10px', cursor: 'pointer',
       fontSize: 12, fontWeight: 500,
       color: active ? '#059669' : '#475569',
       transition: 'all 0.15s',
@@ -140,10 +181,20 @@ export function TabCarte({ data }: Props) {
   const [selEquipes,   setSelEquipes]   = useState<Set<string>>(new Set());
   const [selEssences,  setSelEssences]  = useState<Set<string>>(new Set());
   const [selStatuts,   setSelStatuts]   = useState<Set<string>>(new Set());
-  const [openPanel,    setOpenPanel]    = useState<'classifier' | 'statuts' | 'equipes' | 'essences' | null>(null);
+  const [selAccessibilite, setSelAccessibilite] = useState<Set<string>>(new Set());
+  const [openPanel,    setOpenPanel]    = useState<'classifier' | 'statuts' | 'equipes' | 'essences' | 'accessibilite' | null>(null);
   const [legendOpen,   setLegendOpen]   = useState(true);
-  const [basemap,      setBasemap]      = useState<BasemapId>('carto-light');
+  const [basemap,      setBasemap]      = useState<BasemapId>('esri-hybrid');
   const [basemapOpen,  setBasemapOpen]  = useState(false);
+
+  // Search
+  const [searchInput,    setSearchInput]    = useState('');
+  const [searchOpen,     setSearchOpen]     = useState(false);
+  const [searchExpanded, setSearchExpanded] = useState(false);
+  const [selectedCode, setSelectedCode] = useState<string | null>(null);
+  const [flyTarget,    setFlyTarget]    = useState<[number, number] | null>(null);
+  const searchRef = useRef<HTMLDivElement>(null);
+  const [resetTrigger, setResetTrigger] = useState(0);
 
   const toolbarRef = useRef<HTMLDivElement>(null);
 
@@ -164,6 +215,27 @@ export function TabCarte({ data }: Props) {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
+  // Close search dropdown when clicking outside
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setSearchOpen(false);
+        setSearchExpanded(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  // Search results: filter allFeatures by num_placette code
+  const searchResults = (() => {
+    const q = searchInput.trim().toLowerCase();
+    const pool = q.length > 0
+      ? allFeatures.filter(f => f.properties.num_placette.toLowerCase().includes(q))
+      : allFeatures;
+    return pool.slice(0, q.length > 0 ? 20 : 30);
+  })();
+
   // Derived lists and color map
   const equipeList   = data.equipes.map(e => e.equipe);
   const essenceList  = [...new Set(allFeatures.map(f => f.properties.essence_group).filter(Boolean) as string[])].sort();
@@ -173,9 +245,10 @@ export function TabCarte({ data }: Props) {
   const filtered = allFeatures
     .filter(f => selStatuts.size === 0 || selStatuts.has(f.properties.statut))
     .filter(f => selEquipes.size === 0 || (f.properties.equipe != null && selEquipes.has(f.properties.equipe)))
-    .filter(f => selEssences.size === 0 || (f.properties.essence_group != null && selEssences.has(f.properties.essence_group)));
+    .filter(f => selEssences.size === 0 || (f.properties.essence_group != null && selEssences.has(f.properties.essence_group)))
+    .filter(f => selAccessibilite.size === 0 || selAccessibilite.has(String(f.properties.accessibilite)));
 
-  const hasFilters = selStatuts.size > 0 || selEquipes.size > 0 || selEssences.size > 0;
+  const hasFilters = selStatuts.size > 0 || selEquipes.size > 0 || selEssences.size > 0 || selAccessibilite.size > 0;
 
   // Context-aware counts: each dropdown shows counts filtered by the OTHER active filter
   const equipeCtxMap = new Map<string, number>();
@@ -194,7 +267,7 @@ export function TabCarte({ data }: Props) {
         essenceCtxMap.set(f.properties.essence_group, (essenceCtxMap.get(f.properties.essence_group) ?? 0) + 1);
     });
 
-  function togglePanel(p: 'classifier' | 'statuts' | 'equipes' | 'essences'): void {
+  function togglePanel(p: 'classifier' | 'statuts' | 'equipes' | 'essences' | 'accessibilite'): void {
     setOpenPanel(prev => prev === p ? null : p);
   }
 
@@ -222,6 +295,49 @@ export function TabCarte({ data }: Props) {
     });
   }
 
+  // ── Icon + popup builders (capture classifyMode, essenceColors, selectedCode) ─
+
+  const getIconFn = (f: MapFeature): L.DivIcon => {
+    const color = markerColor(f, classifyMode, essenceColors);
+    const highlighted = f.properties.num_placette === selectedCode;
+    return makeMarkerIcon(highlighted ? '#f59e0b' : color, highlighted);
+  };
+
+  const buildPopupFn = (f: MapFeature): ReactNode => {
+    const color      = markerColor(f, classifyMode, essenceColors);
+    const statut     = f.properties.statut;
+    const isControle = statut === 'controle';
+    const isVisitee  = statut === 'visitee';
+    const isDone     = isVisitee || isControle;
+    const badgeLabel = isControle ? 'Contrôle ✓' : isVisitee ? 'Visitée ✓' : 'Programmée';
+    return (
+      <div style={{ fontFamily: 'system-ui, sans-serif' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 9, paddingBottom: 8, borderBottom: '1px solid #e2e8f0' }}>
+          <div style={{ width: 10, height: 10, borderRadius: '50%', background: color, flexShrink: 0 }} />
+          <span style={{ fontWeight: 700, fontSize: 14, color: '#1e293b' }}>{f.properties.num_placette}</span>
+          {isDone && (
+            <span style={{ marginLeft: 'auto', marginRight: 20, fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: isControle ? 'rgba(139,92,246,0.12)' : 'rgba(16,185,129,0.12)', color: isControle ? '#7c3aed' : '#059669' }}>
+              {badgeLabel}
+            </span>
+          )}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '5px 14px', fontSize: 12 }}>
+          {f.properties.equipe && <><span style={{ color: '#94a3b8' }}>Équipe</span><span style={{ color: '#1e293b', fontWeight: 600 }}>{equipeShort(f.properties.equipe)}</span></>}
+          {f.properties.essence_group && <><span style={{ color: '#94a3b8' }}>Essence</span><span style={{ color: '#1e293b', fontWeight: 600 }}>{f.properties.essence_group}</span></>}
+          {f.properties.dpanef && <><span style={{ color: '#94a3b8' }}>DPANEF</span><span style={{ color: '#1e293b', fontWeight: 600 }}>{f.properties.dpanef}</span></>}
+          {f.properties.altitude != null && <><span style={{ color: '#94a3b8' }}>Altitude</span><span style={{ color: '#1e293b', fontWeight: 600 }}>{f.properties.altitude} m</span></>}
+          {f.properties.pente != null && <><span style={{ color: '#94a3b8' }}>Pente</span><span style={{ color: '#1e293b', fontWeight: 600 }}>{f.properties.pente}°</span></>}
+          {f.properties.distance_repere != null && <><span style={{ color: '#94a3b8' }}>Dist. repère</span><span style={{ color: '#1e293b', fontWeight: 600 }}>{f.properties.distance_repere} m</span></>}
+        </div>
+        {f.properties.description_repere && (
+          <div style={{ marginTop: 8, paddingTop: 7, fontSize: 10.5, color: '#64748b', borderTop: '1px solid #e2e8f0', lineHeight: 1.45 }}>
+            <span style={{ fontWeight: 700, color: '#475569' }}>Repère : </span>{f.properties.description_repere}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
@@ -229,10 +345,13 @@ export function TabCarte({ data }: Props) {
 
       {/* ── Toolbar ─────────────────────────────────────────────────────── */}
       <div ref={toolbarRef} style={{
-        display: 'flex', alignItems: 'center', gap: 8,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        width: '100%', boxSizing: 'border-box',
         background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10,
-        padding: '8px 14px', flexShrink: 0, position: 'relative',
+        padding: '8px 12px', flexShrink: 0, position: 'relative',
       }}>
+        {/* ── Left: filter buttons ───────────────────────────────────────── */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
 
         {/* ── Classifier button ──────────────────────────────────────────── */}
         <div style={{ position: 'relative' }}>
@@ -245,7 +364,7 @@ export function TabCarte({ data }: Props) {
             <DropPanel>
               <p style={SECTION_LABEL}>Symbologie</p>
 
-              {(['statut', 'equipe', 'essence'] as ClassifyMode[]).map(m => (
+              {(['statut', 'equipe', 'essence', 'accessibilite'] as ClassifyMode[]).map(m => (
                 <label key={m} style={{
                   display: 'flex', alignItems: 'center', gap: 8,
                   padding: '5px 0', cursor: 'pointer', fontSize: 12, color: '#334155',
@@ -398,7 +517,7 @@ export function TabCarte({ data }: Props) {
         {/* ── Filtrer par essence ─────────────────────────────────────────── */}
         <div style={{ position: 'relative' }}>
           <FilterBtn
-            label="Essences"
+            label="Formation"
             active={openPanel === 'essences' || selEssences.size > 0}
             badge={selEssences.size || undefined}
             onClick={() => togglePanel('essences')}
@@ -406,7 +525,7 @@ export function TabCarte({ data }: Props) {
           {openPanel === 'essences' && (
             <DropPanel style={{ maxHeight: 380, overflowY: 'auto' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                <p style={{ ...SECTION_LABEL, marginBottom: 0 }}>Filtrer par essence</p>
+                <p style={{ ...SECTION_LABEL, marginBottom: 0 }}>Filtrer par formation</p>
                 <button style={miniBtn} onClick={() => setSelEssences(selEssences.size > 0 ? new Set() : new Set(essenceList))}>
                   {selEssences.size > 0 ? 'Effacer' : 'Tout'}
                 </button>
@@ -439,29 +558,80 @@ export function TabCarte({ data }: Props) {
           )}
         </div>
 
-        {/* Separator */}
-        <div style={{ width: 1, height: 22, background: '#e2e8f0' }} />
+        {/* ── Filtrer par accessibilité ───────────────────────────────────── */}
+        <div style={{ position: 'relative' }}>
+          <FilterBtn
+            label="Accessibilité"
+            active={openPanel === 'accessibilite' || selAccessibilite.size > 0}
+            badge={selAccessibilite.size || undefined}
+            onClick={() => togglePanel('accessibilite')}
+          />
+          {openPanel === 'accessibilite' && (
+            <DropPanel>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <p style={{ ...SECTION_LABEL, marginBottom: 0 }}>Filtrer par accessibilité</p>
+                {selAccessibilite.size > 0 && (
+                  <button style={miniBtn} onClick={() => setSelAccessibilite(new Set())}>Effacer</button>
+                )}
+              </div>
+              {[
+                { key: '1',    label: 'Accessible',      color: '#06b6d4' },
+                { key: '0',    label: 'Non accessible',  color: '#ef4444' },
+                { key: 'null', label: 'Non réalisées',   color: '#94a3b8' },
+              ].map(({ key, label, color }) => {
+                const count = allFeatures.filter(f => String(f.properties.accessibilite) === key).length;
+                return (
+                  <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 0', cursor: 'pointer' }}>
+                    <Checkbox
+                      size="small"
+                      checked={selAccessibilite.has(key)}
+                      onChange={() => setSelAccessibilite(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; })}
+                      sx={{ p: 0.3, color: '#cbd5e1', '&.Mui-checked': { color } }}
+                    />
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, display: 'inline-block', flexShrink: 0 }} />
+                    <span style={{ fontSize: 12, color: '#334155', flex: 1 }}>{label}</span>
+                    <span style={{ fontSize: 10, fontFamily: 'monospace', color: count > 0 ? '#64748b' : '#cbd5e1' }}>{count}</span>
+                  </label>
+                );
+              })}
+            </DropPanel>
+          )}
+        </div>
 
-        {/* Count chip */}
-        <Chip
-          label={loading ? 'Chargement…' : `${filtered.length.toLocaleString()} placette${filtered.length > 1 ? 's' : ''}`}
-          size="small"
-          sx={{ fontSize: 11, height: 26, bgcolor: '#f1f5f9', color: '#475569', border: '1px solid #e2e8f0' }}
-        />
+        </div>{/* end left group */}
 
-        {/* Reset */}
-        {hasFilters && (
-          <button
-            onClick={() => { setSelStatuts(new Set()); setSelEquipes(new Set()); setSelEssences(new Set()); }}
-            style={{
-              background: 'none', border: '1px solid #fca5a5', borderRadius: 7,
-              padding: '4px 10px', cursor: 'pointer', fontSize: 11,
-              color: '#ef4444', fontWeight: 500,
-            }}
-          >
-            Réinitialiser
-          </button>
-        )}
+        {/* ── Right: count + reset ───────────────────────────────────────── */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <div style={{ width: 1, height: 22, background: '#e2e8f0' }} />
+
+          {/* Count chip */}
+          <div style={{
+            background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 20,
+            height: 26, padding: '0 10px', display: 'flex', alignItems: 'center',
+          }}>
+            <span style={{ fontSize: 11, color: '#475569', whiteSpace: 'nowrap' }}>
+              {loading ? 'Chargement…' : `${filtered.length.toLocaleString()} placette${filtered.length > 1 ? 's' : ''}`}
+            </span>
+          </div>
+
+          {/* Reset filters — standalone icon button, only when filters active */}
+          {hasFilters && (
+            <button
+              onClick={() => { setSelStatuts(new Set()); setSelEquipes(new Set()); setSelEssences(new Set()); setSelAccessibilite(new Set()); }}
+              title="Réinitialiser les filtres"
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: 26, height: 26, borderRadius: 8,
+                background: '#fff', border: '1px solid #e2e8f0', cursor: 'pointer', padding: 0,
+              }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                <path d="M3 3v5h5"/>
+              </svg>
+            </button>
+          )}
+        </div>{/* end right group */}
 
       </div>
 
@@ -469,12 +639,13 @@ export function TabCarte({ data }: Props) {
       <div style={{
         flex: 1, minHeight: 0, position: 'relative',
         borderRadius: 12, overflow: 'hidden', border: '1px solid #e2e8f0',
+        touchAction: 'none',
       }}>
 
         {/* ── Floating map legend (collapsible) ───────────────────────────── */}
         {!loading && (
           <div style={{
-            position: 'absolute', top: 12, right: 12, zIndex: 1000,
+            position: 'absolute', top: 60, right: 12, zIndex: 1000,
             background: 'rgba(255,255,255,0.96)', backdropFilter: 'blur(6px)',
             borderRadius: 10, border: '1px solid #e2e8f0',
             boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
@@ -484,17 +655,28 @@ export function TabCarte({ data }: Props) {
             {/* Header — always visible */}
             <div
               onClick={() => setLegendOpen(o => !o)}
+              title={legendOpen ? undefined : 'Légende'}
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                gap: 10, padding: '7px 11px', cursor: 'pointer',
+                gap: 8, padding: '7px 11px', cursor: 'pointer',
                 borderBottom: legendOpen ? '1px solid #f1f5f9' : 'none',
                 background: legendOpen ? '#f8fafc' : 'transparent',
               }}
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#475569" strokeWidth="2">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#475569" strokeWidth="2" style={{ flexShrink: 0 }}>
                 <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
                 <circle cx="3" cy="6" r="1.5" fill="#475569" stroke="none"/><circle cx="3" cy="12" r="1.5" fill="#475569" stroke="none"/><circle cx="3" cy="18" r="1.5" fill="#475569" stroke="none"/>
               </svg>
+              {legendOpen && (
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Légende
+                </span>
+              )}
+              {legendOpen && (
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.5" style={{ marginLeft: 'auto' }}>
+                  <polyline points="18 15 12 9 6 15"/>
+                </svg>
+              )}
             </div>
 
             {/* Body — collapsible */}
@@ -539,6 +721,118 @@ export function TabCarte({ data }: Props) {
                   </div>
                 ))}
 
+                {classifyMode === 'accessibilite' && (
+                  <>
+                    {[
+                      { color: '#06b6d4', label: 'Accessible' },
+                      { color: '#ef4444', label: 'Non accessible' },
+                      { color: '#94a3b8', label: 'Non réalisées' },
+                    ].map(({ color, label }) => (
+                      <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 5 }}>
+                        <span style={{ width: 9, height: 9, borderRadius: '50%', background: color, flexShrink: 0, display: 'inline-block' }} />
+                        <span style={{ fontSize: 11, color: '#334155' }}>{label}</span>
+                      </div>
+                    ))}
+                  </>
+                )}
+
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Search widget — top-right, collapsed by default ─────────────── */}
+        {!loading && (
+          <div ref={searchRef} style={{
+            position: 'absolute', top: 12, right: 12, zIndex: 1001,
+            width: searchExpanded ? 220 : 36,
+            transition: 'width 0.2s ease',
+          }}>
+            {/* Input row */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 7,
+              background: 'rgba(255,255,255,0.96)', backdropFilter: 'blur(6px)',
+              border: '1px solid #e2e8f0', borderRadius: 10,
+              boxShadow: '0 4px 16px rgba(0,0,0,0.10)',
+              padding: searchExpanded ? '6px 10px' : '0',
+              height: 36, overflow: 'hidden',
+            }}>
+              <button
+                onClick={() => { setSearchExpanded(e => { if (e) { setSearchOpen(false); setSearchInput(''); } return !e; }); }}
+                style={{ border: 'none', background: 'none', cursor: 'pointer', padding: '0 10px', display: 'flex', alignItems: 'center', flexShrink: 0 }}
+                title="Rechercher une placette"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2.5">
+                  <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                </svg>
+              </button>
+              {searchExpanded && (
+                <>
+                  <input
+                    autoFocus
+                    value={searchInput}
+                    onChange={e => { setSearchInput(e.target.value); setSearchOpen(true); }}
+                    onFocus={() => setSearchOpen(true)}
+                    placeholder="Rechercher une placette…"
+                    style={{
+                      border: 'none', outline: 'none', background: 'transparent',
+                      fontSize: 11, color: '#334155', width: '100%',
+                      fontFamily: 'inherit',
+                    }}
+                  />
+                  {searchInput && (
+                    <button onClick={() => { setSearchInput(''); setSelectedCode(null); setFlyTarget(null); }}
+                      style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: 14, lineHeight: 1, padding: 0, flexShrink: 0 }}>
+                      ×
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Dropdown */}
+            {searchOpen && (
+              <div style={{
+                marginTop: 4, background: 'rgba(255,255,255,0.98)', backdropFilter: 'blur(6px)',
+                border: '1px solid #e2e8f0', borderRadius: 10,
+                boxShadow: '0 8px 24px rgba(0,0,0,0.13)',
+                maxHeight: 240, overflowY: 'auto',
+              }}>
+                {searchResults.length === 0 ? (
+                  <p style={{ fontSize: 11, color: '#94a3b8', padding: '10px 12px', margin: 0 }}>Aucun résultat</p>
+                ) : searchResults.map(f => {
+                  const isSelected = f.properties.num_placette === selectedCode;
+                  const statut = f.properties.statut;
+                  const dotColor = statut === 'visitee' ? '#10b981' : statut === 'controle' ? '#8b5cf6' : '#94a3b8';
+                  return (
+                    <button key={f.properties.num_placette}
+                      onMouseDown={() => {
+                        const [lon, lat] = f.geometry.coordinates;
+                        setSelectedCode(f.properties.num_placette);
+                        setFlyTarget([lat, lon]);
+                        setSearchInput(f.properties.num_placette);
+                        setSearchOpen(false);
+                        setSearchExpanded(false);
+                      }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 8,
+                        width: '100%', border: 'none', cursor: 'pointer', textAlign: 'left',
+                        padding: '7px 12px',
+                        background: isSelected ? 'rgba(245,158,11,0.08)' : 'transparent',
+                        borderLeft: isSelected ? '3px solid #f59e0b' : '3px solid transparent',
+                      }}>
+                      <span style={{ width: 7, height: 7, borderRadius: '50%', background: dotColor, flexShrink: 0, display: 'inline-block' }} />
+                      <span style={{ fontSize: 12, fontWeight: isSelected ? 700 : 500, color: '#1e293b', flex: 1 }}>
+                        {f.properties.num_placette}
+                      </span>
+                      {f.properties.equipe && (
+                        <span style={{ fontSize: 10, color: '#94a3b8' }}>
+                          {f.properties.equipe.match(/N°(\d+)/)?.[0] ?? ''}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -569,92 +863,38 @@ export function TabCarte({ data }: Props) {
           </div>
         )}
 
-        <MapContainer center={[33.9, -6.0]} zoom={9} style={{ height: '100%', width: '100%' }} zoomControl>
+        <MapContainer center={[33.9, -6.0]} zoom={9} style={{ height: '100%', width: '100%' }} zoomControl touchZoom scrollWheelZoom>
           <TileLayer
             key={basemap}
             url={BASEMAPS.find(b => b.id === basemap)!.url}
             attribution={BASEMAPS.find(b => b.id === basemap)!.attribution}
             maxZoom={BASEMAPS.find(b => b.id === basemap)!.maxZoom}
           />
+          {basemap === 'esri-hybrid' && (
+            <TileLayer
+              url="https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
+              attribution=""
+              maxZoom={19}
+              opacity={1}
+            />
+          )}
 
           {!loading && filtered.length > 0 && <MapFitter features={filtered} />}
+          <MapFlyer target={flyTarget} />
+          <ResetView trigger={resetTrigger} features={allFeatures} />
 
-          {filtered.map(f => {
+          {!loading && filtered.map(f => {
             const [lon, lat] = f.geometry.coordinates;
-            const color      = markerColor(f, classifyMode, essenceColors);
-            const statut     = f.properties.statut;
-            const isVisitee  = statut === 'visitee';
-            const isControle = statut === 'controle';
-            const isDone     = isVisitee || isControle;
-            const badgeLabel = isControle ? 'Contrôle ✓' : isVisitee ? 'Visitée ✓' : 'Programmée';
-            const badgeBg    = isControle ? 'rgba(139,92,246,0.25)' : isVisitee ? 'rgba(16,185,129,0.25)' : 'rgba(148,163,184,0.2)';
-            const badgeColor = isControle ? '#c4b5fd' : isVisitee ? '#6ee7b7' : '#cbd5e1';
             return (
-              <CircleMarker
+              <Marker
                 key={f.properties.num_placette}
-                center={[lat, lon]}
-                radius={3}
-                pathOptions={{
-                  color, fillColor: color,
-                  fillOpacity: isDone ? 0.88 : 0.45,
-                  weight:      isDone ? 1.5 : 1,
-                }}
+                position={[lat, lon]}
+                icon={getIconFn(f)}
               >
-                <Popup minWidth={210} className="ifn-popup" autoPan autoPanPadding={[30, 30]}>
-                  <div style={{ fontFamily: 'system-ui, sans-serif' }}>
-                    <div style={{
-                      display: 'flex', alignItems: 'center', gap: 8,
-                      marginBottom: 9, paddingBottom: 8, borderBottom: '1px solid #e2e8f0',
-                    }}>
-                      <div style={{ width: 10, height: 10, borderRadius: '50%', background: color, flexShrink: 0 }} />
-                      <span style={{ fontWeight: 700, fontSize: 14, color: '#1e293b' }}>
-                        {f.properties.num_placette}
-                      </span>
-                      {isDone && (
-                        <span style={{
-                          marginLeft: 'auto', marginRight: 20, fontSize: 10, fontWeight: 600,
-                          padding: '2px 8px', borderRadius: 20,
-                          background: isControle ? 'rgba(139,92,246,0.12)' : 'rgba(16,185,129,0.12)',
-                          color: isControle ? '#7c3aed' : '#059669',
-                        }}>
-                          {badgeLabel}
-                        </span>
-                      )}
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '5px 14px', fontSize: 12 }}>
-                      {f.properties.equipe && <>
-                        <span style={{ color: '#94a3b8' }}>Équipe</span>
-                        <span style={{ color: '#1e293b', fontWeight: 600 }}>{equipeShort(f.properties.equipe)}</span>
-                      </>}
-                      {f.properties.essence_group && <>
-                        <span style={{ color: '#94a3b8' }}>Essence</span>
-                        <span style={{ color: '#1e293b', fontWeight: 600 }}>{f.properties.essence_group}</span>
-                      </>}
-                      {f.properties.dpanef && <>
-                        <span style={{ color: '#94a3b8' }}>DPANEF</span>
-                        <span style={{ color: '#1e293b', fontWeight: 600 }}>{f.properties.dpanef}</span>
-                      </>}
-                      {f.properties.altitude != null && <>
-                        <span style={{ color: '#94a3b8' }}>Altitude</span>
-                        <span style={{ color: '#1e293b', fontWeight: 600 }}>{f.properties.altitude} m</span>
-                      </>}
-                      {f.properties.pente != null && <>
-                        <span style={{ color: '#94a3b8' }}>Pente</span>
-                        <span style={{ color: '#1e293b', fontWeight: 600 }}>{f.properties.pente}°</span>
-                      </>}
-                      {f.properties.distance_repere != null && <>
-                        <span style={{ color: '#94a3b8' }}>Dist. repère</span>
-                        <span style={{ color: '#1e293b', fontWeight: 600 }}>{f.properties.distance_repere} m</span>
-                      </>}
-                    </div>
-                    {f.properties.description_repere && (
-                      <div style={{ marginTop: 8, paddingTop: 7, fontSize: 10.5, color: '#64748b', borderTop: '1px solid #e2e8f0', lineHeight: 1.45 }}>
-                        <span style={{ fontWeight: 700, color: '#475569' }}>Repère : </span>{f.properties.description_repere}
-                      </div>
-                    )}
-                  </div>
+                <Popup minWidth={210} maxWidth={290} className="ifn-popup" autoPan autoPanPadding={[30, 30]}>
+                  {buildPopupFn(f)}
                 </Popup>
-              </CircleMarker>
+              </Marker>
             );
           })}
         </MapContainer>
@@ -696,6 +936,24 @@ export function TabCarte({ data }: Props) {
             </svg>
           </button>
         </div>
+
+        {/* ── Reset to initial view — bottom-right ── */}
+        <button
+          onClick={() => setResetTrigger(t => t + 1)}
+          title="Vue initiale"
+          style={{
+            position: 'absolute', bottom: 28, right: 10, zIndex: 1000,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            width: 32, height: 32, border: '1px solid #e2e8f0', borderRadius: 8,
+            background: 'rgba(255,255,255,0.96)', backdropFilter: 'blur(6px)',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)', cursor: 'pointer',
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#475569" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+            <path d="M3 3v5h5"/>
+          </svg>
+        </button>
 
       </div>
 

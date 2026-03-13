@@ -19,7 +19,7 @@ interface MapState {
 export const useMapStore = create<MapState>((set) => ({
   center: [33.9, -5.5],
   zoom: 8,
-  basemap: 'google-hybrid',
+  basemap: 'esri-hybrid',
   customLayers: [],
   clickMode: 'none',
   setCenter: (center) => set({ center }),

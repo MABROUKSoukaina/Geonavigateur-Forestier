@@ -9,6 +9,7 @@ import { TILE_URLS, DEFAULT_CENTER, DEFAULT_ZOOM } from '../../utils/constants';
 import { getGpsPosition } from '../../utils/geo';
 import type { NavPoint, Placette, BasemapType } from '../../types';
 import { TRANSPORT_SPEEDS } from '../../types';
+import { calculateRoute } from '../../services/routing';
 
 // ===== MARKER ICONS =====
 const icons = {
@@ -111,7 +112,7 @@ function buildReperePopup(p: Placette): string {
         <div class="popup-item"><div class="popup-item-label">Distance à la placette</div><div class="popup-item-value">${p.distance ?? '--'} m</div></div>
       </div>
       <div class="popup-actions" style="display:flex;flex-direction:row;flex-wrap:wrap;gap:6px;">
-        <button class="popup-btn" style="flex:1;min-width:0;font-size:11px;padding:6px 4px;" onclick="window.__geonav_navigate('${p.id}')">Aller à la placette</button>
+        <button class="popup-btn" style="flex:1;min-width:0;font-size:11px;padding:6px 4px;" onclick="window.__geonav_navigateFromRepere('${p.id}')">Aller à la placette</button>
         <button class="popup-btn" style="flex:1;min-width:0;font-size:11px;padding:6px 4px;" onclick="window.__geonav_navigateRepere('${p.id}')">Y aller (repère)</button>
         <button class="popup-btn parcours-btn" style="flex:1;min-width:0;font-size:11px;padding:6px 4px;" onclick="window.__geonav_addParcours('${p.id}')">+ Parcours</button>
       </div>
@@ -438,11 +439,10 @@ function MapLegend({ customLayers }: { customLayers: { id: string; name: string;
 
 // ===== MAP BASEMAP SWITCHER OVERLAY =====
 const BASEMAP_OPTIONS: { value: BasemapType; label: string }[] = [
-  { value: 'google-hybrid', label: 'Google Hybrid' },
   { value: 'google-sat', label: 'Google Satellite' },
-  { value: 'cartodb-dark', label: 'Dark Mode' },
-  { value: 'osm', label: 'OpenStreetMap' },
-  { value: 'topo', label: 'Topographie' },
+  { value: 'esri-hybrid', label: 'Esri Hybrid' },
+  { value: 'esri-topo', label: 'Esri Topographie' },
+  { value: 'esri-streets', label: 'Esri Streets' },
 ];
 
 function MapBasemapSwitcher({ basemap }: { basemap: BasemapType }) {
@@ -470,6 +470,15 @@ function MapBasemapSwitcher({ basemap }: { basemap: BasemapType }) {
   );
 }
 
+// ===== RESET VIEW — inner component using useMap() directly =====
+function MapResetViewInner({ trigger }: { trigger: number }) {
+  const map = useMap();
+  useEffect(() => {
+    if (trigger > 0) map.flyTo(DEFAULT_CENTER, DEFAULT_ZOOM, { animate: true, duration: 0.8 });
+  }, [trigger, map]);
+  return null;
+}
+
 // ===== MAIN MAP COMPONENT =====
 export function MapView() {
   const basemap = useMapStore((s) => s.basemap);
@@ -488,6 +497,7 @@ export function MapView() {
   const showRoadRoutes = useAppStore((s) => s.showRoadRoutes);
   const showRoadPistes = useAppStore((s) => s.showRoadPistes);
   const showRoadVoies = useAppStore((s) => s.showRoadVoies);
+  const [resetTrigger, setResetTrigger] = useState(0);
   const tile = TILE_URLS[basemap];
   const [userPos, setUserPos] = useState<[number, number] | null>(null);
   const [gpsLoading, setGpsLoading] = useState(false);
@@ -591,6 +601,22 @@ export function MapView() {
         scrollWhenVisible('nav-end-card', 'center');
       }
     };
+    (window as any).__geonav_navigateFromRepere = (id: string) => {
+      const p = useDataStore.getState().placettes.find((pl) => pl.id === id);
+      if (!p?.repere) return;
+      const nav = useNavigationStore.getState();
+      const routingMode = useAppStore.getState().routingMode;
+      nav.setTransportMode('fly');
+      nav.setStartPoint({ type: 'repere', lat: p.repere.lat, lng: p.repere.lng, label: `Repère ${p.code}` });
+      nav.setEndPoint({ type: 'placette', lat: p.lat, lng: p.lng, label: p.code, id: p.id });
+      nav.setNavSubTab('simple');
+      getAppStoreState().setActiveTab('navigation');
+      scrollWhenVisible('nav-end-card', 'center');
+      nav.setIsCalculating(true);
+      calculateRoute(p.repere.lat, p.repere.lng, p.lat, p.lng, 'fly', routingMode)
+        .then((result) => { nav.setRoute(result); })
+        .finally(() => { nav.setIsCalculating(false); });
+    };
     (window as any).__geonav_select = (id: string) => {
       useDataStore.getState().toggleSelectPlacette(id);
     };
@@ -627,7 +653,7 @@ export function MapView() {
   };
 
   return (
-    <div style={{ width: '100%', height: '100%', position: 'relative', cursor: (clickMode !== 'none' || measuring) ? 'crosshair' : undefined }}>
+    <div style={{ width: '100%', height: '100%', position: 'relative', touchAction: 'none', cursor: (clickMode !== 'none' || measuring) ? 'crosshair' : undefined }}>
       <MapContainer
         center={DEFAULT_CENTER}
         zoom={DEFAULT_ZOOM}
@@ -637,13 +663,22 @@ export function MapView() {
         dragging={true}
         touchZoom={true}
         doubleClickZoom={true}
-        scrollWheelZoom={false}
+        scrollWheelZoom={true}
       >
         <TileLayer url={tile.url} attribution={tile.attribution} maxZoom={tile.maxZoom} />
+        {basemap === 'esri-hybrid' && (
+          <TileLayer
+            url="https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
+            attribution=""
+            maxZoom={19}
+            opacity={1}
+          />
+        )}
         <MapClickHandler />
         <MapSync />
         <RouteFitBounds />
         <FitToPlacettesHandler />
+        <MapResetViewInner trigger={resetTrigger} />
         <CoordinatesTracker onMove={setMouseCoords} />
         <GpsFollowHandler userPos={userPos} />
 
@@ -880,6 +915,17 @@ export function MapView() {
         </div>
         <MapLegend customLayers={customLayers} />
         <MapBasemapSwitcher basemap={basemap} />
+        {/* Reset to initial view */}
+        <button
+          className="map-legend-toggle"
+          title="Vue initiale"
+          onClick={() => setResetTrigger(t => t + 1)}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+            <path d="M3 3v5h5"/>
+          </svg>
+        </button>
       </div>
     </div>
   );
