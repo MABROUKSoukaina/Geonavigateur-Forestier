@@ -1277,18 +1277,18 @@ export function Dashboard({ onClose }: Props) {
 
       {/* KPI strip */}
       {data && !loading && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 16, padding: '16px 32px', flexShrink: 0 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 16, padding: '4px 32px 12px', flexShrink: 0 }}>
           {[
             { label: 'Placettes réalisées', value: data.kpi.total_visitees, sub: `/ ${data.kpi.total_programme}`, color: '#059669' },
             { label: "Taux d'avancement", value: `${Number(data.kpi.pct_avancement).toFixed(1)}%`, color: '#2563eb' },
             { label: 'Moyenne / jour', value: Math.round(Number(data.kpi.moy_par_jour)), sub: 'placettes/jour', color: '#f59e0b' },
-            { label: 'Accessibles', value: data.accessibilite.global.nb_accessible, sub: `/ ${data.kpi.total_visitees} réalisées`, color: '#06b6d4' },
-            { label: 'Non accessibles', value: data.accessibilite.global.nb_inaccessible ?? 0, sub: `/ ${data.kpi.total_visitees} réalisées`, color: '#ef4444' },
+            { label: 'Placettes accessibles', value: data.accessibilite.global.nb_accessible, sub: `/ ${data.kpi.total_visitees} réalisées`, color: '#06b6d4' },
+            { label: 'Placettes non accessibles', value: data.accessibilite.global.nb_inaccessible ?? 0, sub: `/ ${data.kpi.total_visitees} réalisées`, color: '#ef4444' },
             { label: 'Placettes contrôlées', value: data.kpi.nb_controle ?? 0, sub: 'vérification qualité', color: '#8b5cf6' },
           ].map((kpi, i) => (
-            <div key={i} style={{ ...S.card, position: 'relative', overflow: 'hidden', padding: '20px 24px 16px' }}>
+            <div key={i} style={{ ...S.card, position: 'relative', overflow: 'hidden', padding: '14px 16px 10px' }}>
               <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: kpi.color, opacity: 0.6 }} />
-              <p style={{ fontSize: 11, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 600, marginBottom: 8 }}>{kpi.label}</p>
+              <p style={{ fontSize: 10, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600, marginBottom: 6, whiteSpace: 'nowrap' }}>{kpi.label}</p>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
                 <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 28, color: kpi.color }}>{kpi.value}</span>
                 {kpi.sub && <span style={{ color: '#94a3b8', fontSize: 13 }}>{kpi.sub}</span>}

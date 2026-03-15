@@ -30,7 +30,7 @@ type ClassifyMode = 'statut' | 'equipe' | 'essence' | 'accessibilite';
 const MODE_LABELS: Record<ClassifyMode, string> = {
   statut:        'Par statut (réalisé / non réalisé)',
   equipe:        'Par équipe',
-  essence:       'Par essence',
+  essence:       'Par formation',
   accessibilite: 'Par accessibilité',
 };
 
@@ -323,7 +323,7 @@ export function TabCarte({ data }: Props) {
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '5px 14px', fontSize: 12 }}>
           {f.properties.equipe && <><span style={{ color: '#94a3b8' }}>Équipe</span><span style={{ color: '#1e293b', fontWeight: 600 }}>{equipeShort(f.properties.equipe)}</span></>}
-          {f.properties.essence_group && <><span style={{ color: '#94a3b8' }}>Essence</span><span style={{ color: '#1e293b', fontWeight: 600 }}>{f.properties.essence_group}</span></>}
+          {f.properties.essence_group && <><span style={{ color: '#94a3b8' }}>Formation</span><span style={{ color: '#1e293b', fontWeight: 600 }}>{f.properties.essence_group}</span></>}
           {f.properties.dpanef && <><span style={{ color: '#94a3b8' }}>DPANEF</span><span style={{ color: '#1e293b', fontWeight: 600 }}>{f.properties.dpanef}</span></>}
           {f.properties.altitude != null && <><span style={{ color: '#94a3b8' }}>Altitude</span><span style={{ color: '#1e293b', fontWeight: 600 }}>{f.properties.altitude} m</span></>}
           {f.properties.pente != null && <><span style={{ color: '#94a3b8' }}>Pente</span><span style={{ color: '#1e293b', fontWeight: 600 }}>{f.properties.pente}°</span></>}
@@ -341,7 +341,7 @@ export function TabCarte({ data }: Props) {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8, minHeight: 0 }}>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4, minHeight: 0 }}>
 
       {/* ── Toolbar ─────────────────────────────────────────────────────── */}
       <div ref={toolbarRef} style={{
