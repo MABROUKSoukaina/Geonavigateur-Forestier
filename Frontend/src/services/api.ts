@@ -1,6 +1,6 @@
 import type { Placette } from '../types';
 
-const BASE_URL = 'https://fstg2pxb-8080.uks1.devtunnels.ms/api';
+const BASE_URL = 'http://localhost:8080/api';
 
 // ─── Raw API response shape ──────────────────────────────────────────────────
 

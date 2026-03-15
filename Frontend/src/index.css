@@ -200,10 +200,10 @@ body {
 }
 
 .logo {
-  width: 42px;
-  height: 42px;
+  width: 76px;
+  height: 76px;
   background: linear-gradient(135deg, var(--accent), var(--accent-light));
-  border-radius: 12px;
+  border-radius: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -211,15 +211,15 @@ body {
 }
 
 .logo svg {
-  width: 24px;
-  height: 24px;
+  width: 42px;
+  height: 42px;
 }
 
 .panel-title {
   flex: 1;
 }
 .panel-title h1 {
-  font-size: 1.25rem;
+  font-size: 1.45rem;
   font-weight: 700;
   color: var(--text);
 }
@@ -1325,7 +1325,7 @@ body {
   background: var(--bg-card);
   /* backdrop-filter removed for WebView perf */
   border: 1px solid var(--accent);
-  border-radius: 16px;
+  border-radius: 18px;
   padding: 10px 16px;
   display: flex;
   align-items: center;

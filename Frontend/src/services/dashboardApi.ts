@@ -1,4 +1,4 @@
-const BACKEND = 'https://fstg2pxb-8080.uks1.devtunnels.ms';
+const BACKEND = 'http://localhost:8080';
 const BASE_URL = `${BACKEND}/api/dashboard`;
 const PLACETTES_BASE = `${BACKEND}/api/placettes`;
 
