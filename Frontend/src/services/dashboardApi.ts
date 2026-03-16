@@ -174,6 +174,11 @@ export interface ProductiviteEquipe {
   jours_restants_estimes: number | null;
 }
 
+export interface ControleParEquipe {
+  equipe: string;
+  nb_controle: number;
+}
+
 export interface DashboardData {
   kpi: KpiGlobal;
   equipes: AvancementEquipe[];
@@ -190,6 +195,7 @@ export interface DashboardData {
     moyParJourEquipe: MoyJourEquipe[];
     productivite: ProductiviteEquipe[];
   };
+  controleParEquipe: ControleParEquipe[];
 }
 
 async function get<T>(path: string): Promise<T> {
@@ -199,7 +205,7 @@ async function get<T>(path: string): Promise<T> {
 }
 
 export async function fetchDashboardData(): Promise<DashboardData> {
-  const [kpi, equipes, strates, essences, groupes, stratesParEquipe, accessibilite, temporel] = await Promise.all([
+  const [kpi, equipes, strates, essences, groupes, stratesParEquipe, accessibilite, temporel, controleParEquipe] = await Promise.all([
     get<KpiGlobal>('/kpi'),
     get<AvancementEquipe[]>('/equipes'),
     get<AvancementStrate[]>('/strates'),
@@ -208,6 +214,7 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     get<StrateParEquipe[]>('/strates-par-equipe'),
     get<{ global: AccessibiliteGlobal; equipes: AccessibiliteEquipe[] }>('/accessibilite'),
     get<{ visitesParJour: VisiteParJour[]; moyParJourEquipe: MoyJourEquipe[]; productivite: ProductiviteEquipe[] }>('/temporel'),
+    get<ControleParEquipe[]>('/controle-par-equipe'),
   ]);
-  return { kpi, equipes, strates, essences, groupes, stratesParEquipe, accessibilite, temporel };
+  return { kpi, equipes, strates, essences, groupes, stratesParEquipe, accessibilite, temporel, controleParEquipe };
 }

@@ -289,4 +289,15 @@ public class DashboardController {
         result.put("features", features);
         return ResponseEntity.ok(result);
     }
+
+    /**
+     * GET /api/dashboard/controle-par-equipe
+     * Number of controlled placettes per team (all teams, including 0).
+     */
+    @GetMapping("/controle-par-equipe")
+    public ResponseEntity<List<Map<String, Object>>> getControleParEquipe() {
+        return ResponseEntity.ok(
+            jdbc.queryForList("SELECT equipe, nb_controle FROM v_controle_par_equipe")
+        );
+    }
 }

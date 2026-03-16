@@ -28,7 +28,7 @@ type BasemapId = typeof BASEMAPS[number]['id'];
 type ClassifyMode = 'statut' | 'equipe' | 'essence' | 'accessibilite';
 
 const MODE_LABELS: Record<ClassifyMode, string> = {
-  statut:        'Par statut (réalisé / non réalisé)',
+  statut:        'Par statut (réalisée / non réalisée)',
   equipe:        'Par équipe',
   essence:       'Par formation',
   accessibilite: 'Par accessibilité',

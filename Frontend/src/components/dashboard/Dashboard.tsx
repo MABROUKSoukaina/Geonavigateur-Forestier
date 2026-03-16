@@ -1172,17 +1172,25 @@ function ControlePieChart({ slices }: { slices: { label: string; value: number; 
 }
 
 function TabControleQualite({ data }: { data: DashboardData }) {
-  const { kpi } = data;
+  const { kpi, controleParEquipe } = data;
   const controle  = kpi.nb_controle ?? 0;
-  const realise   = kpi.total_visitees;
+  const realise   = kpi.total_visitees - controle;
   const restantes = kpi.total_programme - controle - realise;
   const pctCtrl   = realise > 0 ? (controle / realise * 100) : 0;
 
   const slices = [
-    { label: 'Contrôlées',             value: controle,          color: '#8b5cf6' },
-    { label: 'Réalisées non contrôlées', value: realise,            color: '#10b981' },
-    { label: 'Non réalisées',           value: restantes,          color: '#cbd5e1' },
+    { label: 'Contrôlées',               value: controle,  color: '#8b5cf6' },
+    { label: 'Réalisées non contrôlées', value: realise,   color: '#10b981' },
+    { label: 'Non réalisées',            value: restantes, color: '#cbd5e1' },
   ];
+
+  const maxCtrl = Math.max(...controleParEquipe.map(e => e.nb_controle), 1);
+  const BAR_H = 28;
+  const GAP   = 10;
+  const LABEL_W = 110;
+  const BAR_MAX = 260;
+  const VW = LABEL_W + BAR_MAX + 60;
+  const VH = controleParEquipe.length * (BAR_H + GAP);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -1190,9 +1198,9 @@ function TabControleQualite({ data }: { data: DashboardData }) {
       {/* ── KPI header ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
         {[
-          { label: 'Placettes contrôlées',    value: controle,  color: '#8b5cf6', bg: 'rgba(139,92,246,0.07)', sub: 'vérification qualité' },
-          { label: 'Placettes réalisées non contrôlées', value: realise,   color: '#10b981', bg: 'rgba(16,185,129,0.07)', sub: `sur ${kpi.total_programme} programmées` },
-          { label: 'Taux de contrôle',         value: `${pctCtrl.toFixed(1)}%`, color: '#0284c7', bg: 'rgba(2,132,199,0.07)', sub: 'des réalisées contrôlées' },
+          { label: 'Placettes contrôlées',              value: controle,               color: '#8b5cf6', bg: 'rgba(139,92,246,0.07)', sub: 'vérification qualité' },
+          { label: 'Placettes réalisées non contrôlées', value: realise,               color: '#10b981', bg: 'rgba(16,185,129,0.07)', sub: `sur ${kpi.total_programme} programmées` },
+          { label: 'Taux de contrôle',                  value: `${pctCtrl.toFixed(1)}%`, color: '#0284c7', bg: 'rgba(2,132,199,0.07)', sub: 'des réalisées contrôlées' },
         ].map(s => (
           <div key={s.label} style={{ ...S.card, background: s.bg, padding: '10px 14px', borderLeft: `4px solid ${s.color}` }}>
             <div style={{ fontSize: 10, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>{s.label}</div>
@@ -1202,10 +1210,43 @@ function TabControleQualite({ data }: { data: DashboardData }) {
         ))}
       </div>
 
-      {/* ── Pie chart ── */}
-      <Card title="Répartition des placettes">
-        <ControlePieChart slices={slices} />
-      </Card>
+      {/* ── Two charts side by side ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+
+        {/* Pie chart */}
+        <Card title="Répartition des placettes">
+          <ControlePieChart slices={slices} />
+        </Card>
+
+        {/* Bar chart: contrôlées par équipe */}
+        <Card title="Placettes contrôlées par équipe">
+          <svg width="100%" viewBox={`0 0 ${VW} ${VH}`} style={{ display: 'block', overflow: 'visible' }}>
+            {controleParEquipe.map((eq, i) => {
+              const y      = i * (BAR_H + GAP);
+              const color  = equipeColor(eq.equipe);
+              const bw     = eq.nb_controle === 0 ? 2 : (eq.nb_controle / maxCtrl) * BAR_MAX;
+              const short  = equipeShort(eq.equipe);
+              return (
+                <g key={eq.equipe}>
+                  {/* Label */}
+                  <text x={LABEL_W - 8} y={y + BAR_H / 2 + 4} textAnchor="end"
+                    style={{ fontSize: 11, fill: '#475569' }}>{short}</text>
+                  {/* Bar background */}
+                  <rect x={LABEL_W} y={y} width={BAR_MAX} height={BAR_H} rx={5} fill="#f1f5f9" />
+                  {/* Bar fill */}
+                  <rect x={LABEL_W} y={y} width={bw} height={BAR_H} rx={5} fill={color} opacity={eq.nb_controle === 0 ? 0.3 : 0.85} />
+                  {/* Value */}
+                  <text x={LABEL_W + bw + 6} y={y + BAR_H / 2 + 4}
+                    style={{ fontSize: 11, fontWeight: 700, fill: eq.nb_controle === 0 ? '#94a3b8' : color }}>
+                    {eq.nb_controle}
+                  </text>
+                </g>
+              );
+            })}
+          </svg>
+        </Card>
+
+      </div>
 
     </div>
   );
@@ -1286,9 +1327,9 @@ export function Dashboard({ onClose }: Props) {
             { label: 'Placettes non accessibles', value: data.accessibilite.global.nb_inaccessible ?? 0, sub: `/ ${data.kpi.total_visitees} réalisées`, color: '#ef4444' },
             { label: 'Placettes contrôlées', value: data.kpi.nb_controle ?? 0, sub: 'vérification qualité', color: '#8b5cf6' },
           ].map((kpi, i) => (
-            <div key={i} style={{ ...S.card, position: 'relative', overflow: 'hidden', padding: '14px 16px 10px' }}>
+            <div key={i} style={{ ...S.card, position: 'relative', overflow: 'hidden', padding: i === 4 ? '14px 8px 10px' : '14px 16px 10px' }}>
               <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: kpi.color, opacity: 0.6 }} />
-              <p style={{ fontSize: 10, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600, marginBottom: 6, whiteSpace: 'nowrap' }}>{kpi.label}</p>
+              <p style={{ fontSize: 10, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 800, marginBottom: 6, whiteSpace: 'nowrap' }}>{kpi.label}</p>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
                 <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 28, color: kpi.color }}>{kpi.value}</span>
                 {kpi.sub && <span style={{ color: '#94a3b8', fontSize: 13 }}>{kpi.sub}</span>}
