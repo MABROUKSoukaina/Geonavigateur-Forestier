@@ -1172,7 +1172,9 @@ function ControlePieChart({ slices }: { slices: { label: string; value: number; 
 }
 
 function TabControleQualite({ data }: { data: DashboardData }) {
-  const { kpi, controleParEquipe } = data;
+  const { kpi, controleParEquipe, equipes } = data;
+  const [tooltip, setTooltip] = useState<{ x: number; y: number; label: string; n: number } | null>(null);
+
   const controle  = kpi.nb_controle ?? 0;
   const realise   = kpi.total_visitees - controle;
   const restantes = kpi.total_programme - controle - realise;
@@ -1184,13 +1186,41 @@ function TabControleQualite({ data }: { data: DashboardData }) {
     { label: 'Non réalisées',            value: restantes, color: '#cbd5e1' },
   ];
 
-  const maxCtrl = Math.max(...controleParEquipe.map(e => e.nb_controle), 1);
-  const BAR_H = 28;
-  const GAP   = 10;
-  const LABEL_W = 110;
-  const BAR_MAX = 260;
-  const VW = LABEL_W + BAR_MAX + 60;
-  const VH = controleParEquipe.length * (BAR_H + GAP);
+  // Build per-equipe stacked data: [non-contrôlées, contrôlées]
+  const byNum   = (name: string) => parseInt(name.match(/N°(\d+)/)?.[1] ?? '99');
+  const getNum  = (name: string) => { const m = name.match(/N°(\d+)/); return m ? `N°${m[1]}` : ''; };
+  const getNoun = (name: string) => {
+    let s = name.replace(/^Equipe\s+/, '').replace(/\s*\(N°[^)]+\)/, '').trim();
+    if (s.startsWith('Khémisset-')) s = s.slice('Khémisset-'.length);
+    return s;
+  };
+
+  const rows = controleParEquipe
+    .map(ce => {
+      const eq = equipes.find(e => e.equipe === ce.equipe);
+      const totalVisite = eq?.total_visite ?? 0;
+      const nonCtrl = Math.max(totalVisite - ce.nb_controle, 0);
+      return { equipe: ce.equipe, nonCtrl, ctrl: ce.nb_controle, total: nonCtrl + ce.nb_controle };
+    })
+    .sort((a, b) => byNum(a.equipe) - byNum(b.equipe));
+
+  const yMax  = Math.max(...rows.map(r => r.total), 1);
+  const ML = 36, MR = 16, MT = 24, MB = 52;
+  const cH = 220;
+  const VH = MT + cH + MB;
+  const VW = 560;
+  const cW = VW - ML - MR;
+  const BAR_W  = Math.min(52, Math.floor(cW / rows.length * 0.55));
+  const BAR_GAP = Math.floor(cW / rows.length) - BAR_W;
+  const toX = (i: number) => ML + i * (BAR_W + BAR_GAP) + BAR_GAP / 2;
+  const toY = (v: number) => MT + cH - (v / yMax) * cH;
+  const Y_TICKS = 5;
+  const TW = 190, TH = 44;
+
+  const SEGS = [
+    { key: 'nonCtrl' as const, color: '#10b981', label: 'Réalisées non contrôlées' },
+    { key: 'ctrl'    as const, color: '#8b5cf6', label: 'Contrôlées' },
+  ];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -1198,9 +1228,9 @@ function TabControleQualite({ data }: { data: DashboardData }) {
       {/* ── KPI header ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
         {[
-          { label: 'Placettes contrôlées',              value: controle,               color: '#8b5cf6', bg: 'rgba(139,92,246,0.07)', sub: 'vérification qualité' },
-          { label: 'Placettes réalisées non contrôlées', value: realise,               color: '#10b981', bg: 'rgba(16,185,129,0.07)', sub: `sur ${kpi.total_programme} programmées` },
-          { label: 'Taux de contrôle',                  value: `${pctCtrl.toFixed(1)}%`, color: '#0284c7', bg: 'rgba(2,132,199,0.07)', sub: 'des réalisées contrôlées' },
+          { label: 'Placettes contrôlées',               value: controle,                 color: '#8b5cf6', bg: 'rgba(139,92,246,0.07)',  sub: 'vérification qualité' },
+          { label: 'Placettes réalisées non contrôlées', value: realise,                  color: '#10b981', bg: 'rgba(16,185,129,0.07)',  sub: `sur ${kpi.total_programme} programmées` },
+          { label: 'Taux de contrôle',                   value: `${pctCtrl.toFixed(1)}%`, color: '#0284c7', bg: 'rgba(2,132,199,0.07)',   sub: 'des réalisées contrôlées' },
         ].map(s => (
           <div key={s.label} style={{ ...S.card, background: s.bg, padding: '10px 14px', borderLeft: `4px solid ${s.color}` }}>
             <div style={{ fontSize: 10, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>{s.label}</div>
@@ -1210,43 +1240,79 @@ function TabControleQualite({ data }: { data: DashboardData }) {
         ))}
       </div>
 
-      {/* ── Two charts side by side ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+      {/* ── Pie chart ── */}
+      <Card title="Répartition des placettes">
+        <ControlePieChart slices={slices} />
+      </Card>
 
-        {/* Pie chart */}
-        <Card title="Répartition des placettes">
-          <ControlePieChart slices={slices} />
-        </Card>
-
-        {/* Bar chart: contrôlées par équipe */}
-        <Card title="Placettes contrôlées par équipe">
+      {/* ── Stacked bar chart: contrôlées vs non-contrôlées par équipe ── */}
+      <Card title="Réalisées par équipe (contrôlées / non contrôlées)">
+        <div style={{ position: 'relative' }}>
           <svg width="100%" viewBox={`0 0 ${VW} ${VH}`} style={{ display: 'block', overflow: 'visible' }}>
-            {controleParEquipe.map((eq, i) => {
-              const y      = i * (BAR_H + GAP);
-              const color  = equipeColor(eq.equipe);
-              const bw     = eq.nb_controle === 0 ? 2 : (eq.nb_controle / maxCtrl) * BAR_MAX;
-              const short  = equipeShort(eq.equipe);
+
+            {/* Y grid */}
+            {Array.from({ length: Y_TICKS + 1 }, (_, i) => {
+              const val = Math.round((yMax * i) / Y_TICKS);
+              const y   = toY(val);
               return (
-                <g key={eq.equipe}>
-                  {/* Label */}
-                  <text x={LABEL_W - 8} y={y + BAR_H / 2 + 4} textAnchor="end"
-                    style={{ fontSize: 11, fill: '#475569' }}>{short}</text>
-                  {/* Bar background */}
-                  <rect x={LABEL_W} y={y} width={BAR_MAX} height={BAR_H} rx={5} fill="#f1f5f9" />
-                  {/* Bar fill */}
-                  <rect x={LABEL_W} y={y} width={bw} height={BAR_H} rx={5} fill={color} opacity={eq.nb_controle === 0 ? 0.3 : 0.85} />
-                  {/* Value */}
-                  <text x={LABEL_W + bw + 6} y={y + BAR_H / 2 + 4}
-                    style={{ fontSize: 11, fontWeight: 700, fill: eq.nb_controle === 0 ? '#94a3b8' : color }}>
-                    {eq.nb_controle}
-                  </text>
+                <g key={i}>
+                  <line x1={ML} x2={VW - MR} y1={y} y2={y}
+                    stroke={i === 0 ? '#94a3b8' : '#e2e8f0'} strokeWidth={i === 0 ? 1.5 : 1} />
+                  <text x={ML - 5} y={y} textAnchor="end" dominantBaseline="middle" fontSize={10} fill="#64748b">{val}</text>
                 </g>
               );
             })}
-          </svg>
-        </Card>
 
-      </div>
+            {/* Bars */}
+            {rows.map((r, i) => {
+              const bx = toX(i);
+              let cumY = MT + cH;
+              return (
+                <g key={r.equipe}>
+                  {SEGS.map(seg => {
+                    const n  = r[seg.key];
+                    if (n === 0) return null;
+                    const bh = (n / yMax) * cH;
+                    cumY -= bh;
+                    const segY = cumY;
+                    return (
+                      <rect key={seg.key} x={bx} y={segY} width={BAR_W} height={bh}
+                        fill={seg.color} rx={0} opacity={0.88} style={{ cursor: 'pointer' }}
+                        onMouseEnter={() => setTooltip({ x: bx + BAR_W / 2 - TW / 2, y: segY - TH - 6, label: `${getNoun(r.equipe)} — ${seg.label}`, n })}
+                        onMouseLeave={() => setTooltip(null)} />
+                    );
+                  })}
+                  {/* Total */}
+                  <text x={bx + BAR_W / 2} y={toY(r.total) - 5} textAnchor="middle" fontSize={10} fill="#475569" fontWeight="700">{r.total}</text>
+                  {/* Equipe N° */}
+                  <text x={bx + BAR_W / 2} y={MT + cH + 14} textAnchor="middle" fontSize={10} fill="#64748b" fontWeight="600">{getNum(r.equipe)}</text>
+                  {/* Equipe noun */}
+                  <text x={bx + BAR_W / 2} y={MT + cH + 28} textAnchor="middle" fontSize={8.5} fill="#334155">{getNoun(r.equipe)}</text>
+                </g>
+              );
+            })}
+
+            {/* Tooltip */}
+            {tooltip && (
+              <g style={{ pointerEvents: 'none' }}>
+                <rect x={tooltip.x} y={tooltip.y} width={TW} height={TH} rx={6} fill="#1e293b" opacity={0.93} />
+                <text x={tooltip.x + TW / 2} y={tooltip.y + 14} textAnchor="middle" fontSize={10} fill="#94a3b8">{tooltip.label}</text>
+                <text x={tooltip.x + TW / 2} y={tooltip.y + 32} textAnchor="middle" fontSize={12} fill="#fff" fontWeight="700">{tooltip.n} placettes</text>
+              </g>
+            )}
+          </svg>
+
+          {/* Legend */}
+          <div style={{ display: 'flex', gap: 20, justifyContent: 'center', marginTop: 8 }}>
+            {SEGS.map(s => (
+              <div key={s.key} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#475569' }}>
+                <div style={{ width: 10, height: 10, borderRadius: 2, background: s.color }} />
+                {s.label}
+              </div>
+            ))}
+          </div>
+        </div>
+      </Card>
 
     </div>
   );
