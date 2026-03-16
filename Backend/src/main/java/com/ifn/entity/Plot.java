@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.NoArgsConstructor;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "plot")
@@ -142,4 +143,10 @@ public class Plot {
 
     @Column(name = "country_code")
     private Integer countryCode;
+
+    // ─── Audit ─────────────────────────────────────────────────────────────────
+    // Set automatically by PostgreSQL trigger (fetched from collect_ifn.collect.ofc_record).
+    // JPA must not write this column — the trigger owns it.
+    @Column(name = "date_modified", insertable = false, updatable = false)
+    private LocalDateTime dateModified;
 }

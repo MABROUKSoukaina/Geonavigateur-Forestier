@@ -218,3 +218,13 @@ export async function fetchDashboardData(): Promise<DashboardData> {
   ]);
   return { kpi, equipes, strates, essences, groupes, stratesParEquipe, accessibilite, temporel, controleParEquipe };
 }
+
+// ─── Plot CSV import ───────────────────────────────────────────────────────────
+
+export async function importPlotsCsv(file: File): Promise<{ inserted: number; updated: number }> {
+  const form = new FormData();
+  form.append('file', file);
+  const res = await fetch(`${BACKEND}/api/plots/import`, { method: 'POST', body: form });
+  if (!res.ok) throw new Error(`Import failed: ${res.status}`);
+  return res.json();
+}

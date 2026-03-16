@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type {
   DashboardData, AvancementEquipe, AvancementEssence, AccessibiliteEquipe, ProductiviteEquipe, StrateParEquipe,
 } from '../../services/dashboardApi';
-import { fetchDashboardData } from '../../services/dashboardApi';
+import { fetchDashboardData, importPlotsCsv } from '../../services/dashboardApi';
 import { TabCarte } from './TabCarte';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -1049,9 +1049,9 @@ function TabAccessibilite({ data }: { data: DashboardData }) {
   const nbInacc = g.nb_inaccessible ?? 0;
 
   const row1 = [
-    { label: 'Total réalisées', value: g.total_visitees, pct: null,                                        color: '#475569', bg: '#f1f5f9' },
-    { label: 'Accessibles',     value: g.nb_accessible,  pct: +(g.nb_accessible / total * 100).toFixed(1), color: '#059669', bg: '#f0fdf4' },
-    { label: 'Inaccessibles',   value: nbInacc,          pct: +(nbInacc         / total * 100).toFixed(1), color: '#e11d48', bg: '#fff1f2' },
+    { label: 'Placettes réalisées', value: g.total_visitees, pct: null,                                        color: '#475569', bg: '#f1f5f9' },
+    { label: 'Placettes accessibles',     value: g.nb_accessible,  pct: +(g.nb_accessible / total * 100).toFixed(1), color: '#059669', bg: '#f0fdf4' },
+    { label: 'Placettes inaccessibles',   value: nbInacc,          pct: +(nbInacc         / total * 100).toFixed(1), color: '#e11d48', bg: '#fff1f2' },
   ];
 
   const row2 = [
@@ -1062,7 +1062,7 @@ function TabAccessibilite({ data }: { data: DashboardData }) {
 
   function StatCard({ s }: { s: { label: string; value: number; pct: number | null; color: string; bg: string } }) {
     return (
-      <div style={{ ...S.card, background: s.bg, padding: '10px 14px', textAlign: 'center', borderLeft: `4px solid ${s.color}` }}>
+      <div style={{ ...S.card, background: s.bg, padding: '4px 6px 2px', textAlign: 'center', borderLeft: `4px solid ${s.color}` }}>
         <div style={{ fontSize: 10, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
           {s.label}
         </div>
@@ -1231,22 +1231,26 @@ function TabControleQualite({ data }: { data: DashboardData }) {
       {/* ── KPI header ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
         {[
-          { label: 'Placettes contrôlées',               value: controle,                 color: '#8b5cf6', bg: 'rgba(139,92,246,0.07)',  sub: 'vérification qualité' },
-          { label: 'Placettes réalisées non contrôlées', value: realise,                  color: '#10b981', bg: 'rgba(16,185,129,0.07)',  sub: `sur ${kpi.total_programme} programmées` },
-          { label: 'Taux de contrôle',                   value: `${pctCtrl.toFixed(1)}%`, color: '#0284c7', bg: 'rgba(2,132,199,0.07)',   sub: 'des réalisées contrôlées' },
+          { label: 'Placettes contrôlées',               value: controle,                 pct: +((controle / (realise + controle || 1)) * 100).toFixed(1), color: '#8b5cf6', bg: 'rgba(139,92,246,0.07)',  sub: `sur ${realise + controle} réalisées` },
+          { label: 'Placettes réalisées non contrôlées', value: realise,                  pct: +((realise  / (realise + controle || 1)) * 100).toFixed(1), color: '#10b981', bg: 'rgba(16,185,129,0.07)',  sub: `sur ${kpi.total_programme} programmées` },
+          { label: 'Taux de contrôle',                   value: `${pctCtrl.toFixed(1)}%`, pct: null,                                                       color: '#0284c7', bg: 'rgba(2,132,199,0.07)',   sub: 'des réalisées contrôlées' },
         ].map(s => (
-          <div key={s.label} style={{ ...S.card, background: s.bg, padding: '10px 14px', borderLeft: `4px solid ${s.color}` }}>
-            <div style={{ fontSize: 10, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>{s.label}</div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: s.color, lineHeight: 1 }}>{s.value}</div>
-            <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 3 }}>{s.sub}</div>
+          <div key={s.label} style={{ ...S.card, background: s.bg, padding: '0px 6px', borderLeft: `4px solid ${s.color}`, display: 'flex', alignItems: 'center', gap: 12 }}>
+            {/* Left: number + pct */}
+            <div style={{ textAlign: 'center', flexShrink: 0 }}>
+              <div style={{ fontSize: 26, fontWeight: 800, color: s.color, lineHeight: 1 }}>{s.value}</div>
+              {s.pct !== null && <div style={{ fontSize: 12, fontWeight: 700, color: s.color, opacity: 0.75, marginTop: 2 }}>{s.pct}%</div>}
+            </div>
+            {/* Divider */}
+            <div style={{ width: 1, alignSelf: 'stretch', background: s.color, opacity: 0.2 }} />
+            {/* Right: label + sub */}
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 10, color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', lineHeight: 1.4 }}>{s.label}</div>
+              <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 3 }}>{s.sub}</div>
+            </div>
           </div>
         ))}
       </div>
-
-      {/* ── Pie chart ── */}
-      <Card title="Répartition des placettes">
-        <ControlePieChart slices={slices} />
-      </Card>
 
       {/* ── Stacked bar chart: contrôlées vs non-contrôlées par équipe ── */}
       <Card title="Avancement du contrôle qualité par équipe">
@@ -1341,12 +1345,33 @@ export function Dashboard({ onClose }: Props) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importMsg, setImportMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const load = async () => {
     setLoading(true); setError(null);
     try { setData(await fetchDashboardData()); }
     catch (e) { setError(e instanceof Error ? e.message : 'Erreur de connexion'); }
     finally { setLoading(false); }
+  };
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    setImporting(true);
+    setImportMsg(null);
+    try {
+      const res = await importPlotsCsv(file);
+      setImportMsg({ text: `Import réussi : ${res.inserted} ajoutées, ${res.updated} mises à jour`, ok: true });
+      load();
+    } catch (err) {
+      setImportMsg({ text: err instanceof Error ? err.message : 'Erreur import', ok: false });
+    } finally {
+      setImporting(false);
+      setTimeout(() => setImportMsg(null), 6000);
+    }
   };
 
   useEffect(() => { load(); }, []);
@@ -1376,7 +1401,35 @@ export function Dashboard({ onClose }: Props) {
             )}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {/* Import toast */}
+          {importMsg && (
+            <span style={{
+              fontSize: 12, padding: '4px 10px', borderRadius: 6, fontWeight: 500,
+              background: importMsg.ok ? '#dcfce7' : '#fee2e2',
+              color: importMsg.ok ? '#166534' : '#991b1b',
+              border: `1px solid ${importMsg.ok ? '#86efac' : '#fca5a5'}`,
+            }}>
+              {importMsg.text}
+            </span>
+          )}
+          {/* Hidden file input */}
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".csv"
+            style={{ display: 'none' }}
+            onChange={handleImport}
+          />
+          {/* Import CSV button */}
+          <button
+            onClick={() => fileRef.current?.click()}
+            disabled={importing}
+            title="Importer des placettes (CSV)"
+            style={{ ...S.iconBtn, opacity: importing ? 0.4 : 1, fontSize: 18 }}
+          >
+            ↓
+          </button>
           <button onClick={load} disabled={loading} title="Rafraîchir"
             style={{ ...S.iconBtn, opacity: loading ? 0.4 : 1 }}>
             ↺
@@ -1394,13 +1447,13 @@ export function Dashboard({ onClose }: Props) {
             { label: 'Moyenne / jour', value: Math.round(Number(data.kpi.moy_par_jour)), sub: 'placettes/jour', color: '#f59e0b' },
             { label: 'Placettes accessibles', value: data.accessibilite.global.nb_accessible, sub: `/ ${data.kpi.total_visitees} réalisées`, color: '#06b6d4' },
             { label: 'Placettes non accessibles', value: data.accessibilite.global.nb_inaccessible ?? 0, sub: `/ ${data.kpi.total_visitees} réalisées`, color: '#ef4444' },
-            { label: 'Placettes contrôlées', value: data.kpi.nb_controle ?? 0, sub: 'vérification qualité', color: '#8b5cf6' },
+            { label: 'Placettes contrôlées', value: data.kpi.nb_controle ?? 0, sub: `/ ${data.kpi.total_visitees} réalisées`, color: '#8b5cf6' },
           ].map((kpi, i) => (
-            <div key={i} style={{ ...S.card, position: 'relative', overflow: 'hidden', padding: i === 4 ? '14px 8px 10px' : '14px 16px 10px' }}>
+            <div key={i} style={{ ...S.card, position: 'relative', overflow: 'hidden', padding: i === 4 ? '20px 8px 16px' : '20px 16px 16px' }}>
               <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: kpi.color, opacity: 0.6 }} />
               <p style={{ fontSize: 10, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 800, marginBottom: 6, whiteSpace: 'nowrap' }}>{kpi.label}</p>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 28, color: kpi.color }}>{kpi.value}</span>
+                <span style={{ fontWeight: 800, fontSize: 38, color: kpi.color, lineHeight: 1 }}>{kpi.value}</span>
                 {kpi.sub && <span style={{ color: '#94a3b8', fontSize: 13 }}>{kpi.sub}</span>}
               </div>
             </div>
