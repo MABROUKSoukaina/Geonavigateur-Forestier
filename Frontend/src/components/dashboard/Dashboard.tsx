@@ -448,6 +448,7 @@ function StrateParEquipeChart({ rows }: { rows: StrateParEquipe[] }) {
   const getNoun = (name: string) => {
     let s = name.replace(/^Equipe\s+/, '').replace(/\s*\(N°[^)]+\)/, '').trim();
     if (s.startsWith('Khémisset-')) s = s.slice('Khémisset-'.length);
+    if (s.includes('_')) s = s.slice(s.lastIndexOf('_') + 1);
     return s;
   };
 
@@ -974,6 +975,7 @@ function AccessParEquipeChart({ equipes }: { equipes: AccessibiliteEquipe[] }) {
   const getNoun = (name: string) => {
     let s = name.replace(/^Equipe\s+/, '').replace(/\s*\(N°[^)]+\)/, '').trim();
     if (s.startsWith('Khémisset-')) s = s.slice('Khémisset-'.length);
+    if (s.includes('_')) s = s.slice(s.lastIndexOf('_') + 1);
     return s;
   };
   const TW = 190, TH = 56;
@@ -1192,6 +1194,7 @@ function TabControleQualite({ data }: { data: DashboardData }) {
   const getNoun = (name: string) => {
     let s = name.replace(/^Equipe\s+/, '').replace(/\s*\(N°[^)]+\)/, '').trim();
     if (s.startsWith('Khémisset-')) s = s.slice('Khémisset-'.length);
+    if (s.includes('_')) s = s.slice(s.lastIndexOf('_') + 1);
     return s;
   };
 
@@ -1246,7 +1249,7 @@ function TabControleQualite({ data }: { data: DashboardData }) {
       </Card>
 
       {/* ── Stacked bar chart: contrôlées vs non-contrôlées par équipe ── */}
-      <Card title="Réalisées par équipe (contrôlées / non contrôlées)">
+      <Card title="Avancement du contrôle qualité par équipe">
         <div style={{ position: 'relative' }}>
           <svg width="100%" viewBox={`0 0 ${VW} ${VH}`} style={{ display: 'block', overflow: 'visible' }}>
 
