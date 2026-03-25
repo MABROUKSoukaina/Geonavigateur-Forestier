@@ -1,6 +1,6 @@
-const BACKEND = 'http://localhost:8080';
-const BASE_URL = `${BACKEND}/api/dashboard`;
-const PLACETTES_BASE = `${BACKEND}/api/placettes`;
+const BACKEND = '';
+const BASE_URL = `/api/dashboard`;
+const PLACETTES_BASE = `/api/placettes`;
 
 // ─── GeoJSON types ────────────────────────────────────────────────────────────
 
@@ -62,7 +62,7 @@ export interface MapFeature {
     description_repere: string | null;
     distance_repere: number | null;
     azimut_repere: number | null;
-    statut: 'visitee' | 'programmee' | 'controle';
+    statut: 'visitee' | 'programmee' | 'controle' | 'controle_service';
     accessibilite: number | null;
     a_pied: number | null;
     date_modified: string | null;
@@ -91,6 +91,7 @@ export interface KpiGlobal {
   nb_jours_terrain: number;
   moy_par_jour: number;
   nb_controle: number;
+  nb_controle_service: number;
 }
 
 export interface AvancementEquipe {
@@ -179,6 +180,11 @@ export interface ControleParEquipe {
   nb_controle: number;
 }
 
+export interface ControleServiceParEquipe {
+  equipe: string;
+  nb_controle_service: number;
+}
+
 export interface DashboardData {
   kpi: KpiGlobal;
   equipes: AvancementEquipe[];
@@ -196,6 +202,7 @@ export interface DashboardData {
     productivite: ProductiviteEquipe[];
   };
   controleParEquipe: ControleParEquipe[];
+  controleServiceParEquipe: ControleServiceParEquipe[];
 }
 
 async function get<T>(path: string): Promise<T> {
@@ -205,7 +212,7 @@ async function get<T>(path: string): Promise<T> {
 }
 
 export async function fetchDashboardData(): Promise<DashboardData> {
-  const [kpi, equipes, strates, essences, groupes, stratesParEquipe, accessibilite, temporel, controleParEquipe] = await Promise.all([
+  const [kpi, equipes, strates, essences, groupes, stratesParEquipe, accessibilite, temporel, controleParEquipe, controleServiceParEquipe] = await Promise.all([
     get<KpiGlobal>('/kpi'),
     get<AvancementEquipe[]>('/equipes'),
     get<AvancementStrate[]>('/strates'),
@@ -215,8 +222,9 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     get<{ global: AccessibiliteGlobal; equipes: AccessibiliteEquipe[] }>('/accessibilite'),
     get<{ visitesParJour: VisiteParJour[]; moyParJourEquipe: MoyJourEquipe[]; productivite: ProductiviteEquipe[] }>('/temporel'),
     get<ControleParEquipe[]>('/controle-par-equipe'),
+    get<ControleServiceParEquipe[]>('/controle-service-par-equipe'),
   ]);
-  return { kpi, equipes, strates, essences, groupes, stratesParEquipe, accessibilite, temporel, controleParEquipe };
+  return { kpi, equipes, strates, essences, groupes, stratesParEquipe, accessibilite, temporel, controleParEquipe, controleServiceParEquipe };
 }
 
 // ─── Plot CSV import ───────────────────────────────────────────────────────────

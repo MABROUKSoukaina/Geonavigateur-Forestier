@@ -8,7 +8,7 @@ import { fetchMapGeoJson, type MapFeature } from '../../services/dashboardApi';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const EQUIPE_COLORS = ['#818cf8', '#4ade80', '#f59e0b', '#ef4444', '#38bdf8', '#c084fc'];
+const EQUIPE_COLORS = ['#818cf8', '#4ade80', '#f59e0b', '#ec4899', '#38bdf8', '#c084fc'];
 
 const ESSENCE_PALETTE = [
   '#0ea5e9', '#8b5cf6', '#f97316', '#10b981', '#ec4899',
@@ -50,12 +50,12 @@ function equipeShort(name: string): string {
 // ─── DivIcon factories ────────────────────────────────────────────────────────
 
 function makeMarkerIcon(color: string, highlighted: boolean): L.DivIcon {
-  const dot = highlighted ? 18 : 10;
+  const dot = highlighted ? 12 : 5;
   const hit = 28; // large transparent hit area for easy clicking
   const glow = highlighted ? `0 0 12px ${color},` : '';
   return L.divIcon({
     className: '',
-    html: `<div style="width:${hit}px;height:${hit}px;display:flex;align-items:center;justify-content:center;"><div style="width:${dot}px;height:${dot}px;background:${color};border:2.5px solid white;border-radius:50%;box-shadow:${glow}0 2px 6px rgba(0,0,0,0.3);"></div></div>`,
+    html: `<div style="width:${hit}px;height:${hit}px;display:flex;align-items:center;justify-content:center;"><div style="width:${dot}px;height:${dot}px;background:${color};border:none;border-radius:50%;box-shadow:${glow}0 2px 6px rgba(0,0,0,0.3);"></div></div>`,
     iconSize: [hit, hit] as L.PointExpression,
     iconAnchor: [hit / 2, hit / 2] as L.PointExpression,
     popupAnchor: [0, -(dot / 2 + 3)] as L.PointExpression,
@@ -69,11 +69,11 @@ function markerColor(f: MapFeature, mode: ClassifyMode, essenceColors: Map<strin
   if (mode === 'accessibilite') {
     if (f.properties.accessibilite === 1) return '#06b6d4';   // accessible — cyan
     if (f.properties.accessibilite === 0) return '#ef4444';   // non accessible — red
-    return '#94a3b8';                                          // not visited / unknown
+    return '#bcc5d0';                                          // not visited / unknown
   }
   if (f.properties.statut === 'visitee')  return '#10b981';
   if (f.properties.statut === 'controle') return '#8b5cf6';
-  return '#94a3b8';
+  return '#bcc5d0';
 }
 
 // ─── MapFitter ────────────────────────────────────────────────────────────────
@@ -86,7 +86,7 @@ function MapFitter({ features }: { features: MapFeature[] }) {
     done.current = true;
     map.fitBounds(
       features.map(f => [f.geometry.coordinates[1], f.geometry.coordinates[0]] as [number, number]),
-      { padding: [40, 40], maxZoom: 12 },
+      { padding: [0, 0], maxZoom: 16 },
     );
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [features]);
@@ -110,7 +110,7 @@ function ResetView({ trigger, features }: { trigger: number; features: { geometr
     if (trigger > 0 && features.length > 0) {
       map.fitBounds(
         features.map(f => [f.geometry.coordinates[1], f.geometry.coordinates[0]] as [number, number]),
-        { padding: [40, 40], maxZoom: 12, animate: true },
+        { padding: [0, 0], maxZoom: 16, animate: true },
       );
     }
   }, [trigger, map]);
@@ -701,7 +701,7 @@ export function TabCarte({ data }: Props) {
                       <span style={{ fontSize: 10, color: '#475569' }}>Contrôlée</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#94a3b8', flexShrink: 0, display: 'inline-block' }} />
+                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#bcc5d0', flexShrink: 0, display: 'inline-block' }} />
                       <span style={{ fontSize: 11, color: '#1e293b', fontWeight: 600 }}>Non réalisée</span>
                     </div>
                   </>
@@ -726,7 +726,7 @@ export function TabCarte({ data }: Props) {
                     {[
                       { color: '#06b6d4', label: 'Accessible' },
                       { color: '#ef4444', label: 'Non accessible' },
-                      { color: '#94a3b8', label: 'Non réalisées' },
+                      { color: '#bcc5d0', label: 'Non réalisées' },
                     ].map(({ color, label }) => (
                       <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 5 }}>
                         <span style={{ width: 9, height: 9, borderRadius: '50%', background: color, flexShrink: 0, display: 'inline-block' }} />
@@ -803,7 +803,7 @@ export function TabCarte({ data }: Props) {
                 ) : searchResults.map(f => {
                   const isSelected = f.properties.num_placette === selectedCode;
                   const statut = f.properties.statut;
-                  const dotColor = statut === 'visitee' ? '#10b981' : statut === 'controle' ? '#8b5cf6' : '#94a3b8';
+                  const dotColor = statut === 'visitee' ? '#10b981' : statut === 'controle' ? '#8b5cf6' : '#bcc5d0';
                   return (
                     <button key={f.properties.num_placette}
                       onMouseDown={() => {
@@ -863,7 +863,7 @@ export function TabCarte({ data }: Props) {
           </div>
         )}
 
-        <MapContainer center={[33.9, -6.0]} zoom={9} style={{ height: '100%', width: '100%' }} zoomControl touchZoom scrollWheelZoom>
+        <MapContainer center={[33.9, -6.0]} zoom={10} style={{ height: '100%', width: '100%' }} zoomControl touchZoom scrollWheelZoom>
           <TileLayer
             key={basemap}
             url={BASEMAPS.find(b => b.id === basemap)!.url}

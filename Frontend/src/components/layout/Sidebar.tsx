@@ -1,3 +1,5 @@
+import { useNavigate } from 'react-router-dom';
+import ForestIcon from '@mui/icons-material/Forest';
 import { useAppStore } from '../../stores/useAppStore';
 import { NavigationPanel } from '../panels/NavigationPanel';
 import { PlacettesPanel } from '../panels/PlacettesPanel';
@@ -12,9 +14,10 @@ const TABS: { key: TabType; label: string }[] = [
   { key: 'layers', label: 'Couches' },
 ];
 
-interface SidebarProps { onShowDashboard: () => void; }
+interface SidebarProps { onShowDashboard?: () => void; }
 
 export function Sidebar({ onShowDashboard }: SidebarProps) {
+  const navigate = useNavigate();
   const { routingMode, setRoutingMode, activeTab, setActiveTab,
     showRoadRoutes, showRoadPistes, showRoadVoies,
     toggleRoadRoutes, toggleRoadPistes, toggleRoadVoies } = useAppStore();
@@ -34,18 +37,15 @@ export function Sidebar({ onShowDashboard }: SidebarProps) {
       <div className="panel-header" style={{ justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div className="logo">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
-              <circle cx="12" cy="10" r="3"/>
-            </svg>
+            <ForestIcon style={{ fontSize: 26 }} />
           </div>
           <div className="panel-title">
-            <h1>GeoNav Pro</h1>
+            <h1>GeoNav</h1>
             <span>Placettes Forestières RSK</span>
           </div>
         </div>
         <button
-          onClick={onShowDashboard}
+          onClick={() => navigate('/dashboard')}
           title="Tableau de bord IFN"
           style={{
             display: 'flex', alignItems: 'center', gap: 5,

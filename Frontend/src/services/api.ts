@@ -1,6 +1,6 @@
 import type { Placette } from '../types';
 
-const BASE_URL = 'http://localhost:8080/api';
+const BASE_URL = '/api';
 
 // ─── Raw API response shape ──────────────────────────────────────────────────
 
@@ -55,7 +55,7 @@ export async function fetchPlacettes(params?: {
   strate?: string;
   essence?: string;
 }): Promise<Placette[]> {
-  const url = new URL(`${BASE_URL}/placettes`);
+  const url = new URL(`${BASE_URL}/placettes`, window.location.origin);
   if (params) {
     Object.entries(params).forEach(([k, v]) => {
       if (v) url.searchParams.set(k, v);
