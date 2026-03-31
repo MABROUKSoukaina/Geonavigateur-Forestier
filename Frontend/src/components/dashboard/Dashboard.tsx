@@ -1111,12 +1111,12 @@ function TabAccessibilite({ data }: { data: DashboardData }) {
       </div>
 
       {/* ── Accessible / Inaccessible per équipe ── */}
-      <Card title="Accessible / Inaccessible par équipe">
+      <Card title="Placettes accessibles / inaccessibles par équipe">
         <AccessParEquipeChart equipes={activeEquipes} />
       </Card>
 
       {/* ── Multi-series bar chart per équipe ── */}
-      <Card title="Distance parcourue à pied — par équipe">
+      <Card title="Distance parcourue à pied par équipe">
         <GroupedBarChart equipes={activeEquipes} />
       </Card>
 
@@ -1199,22 +1199,14 @@ function ControlePieChart({ slices }: { slices: { label: string; value: number; 
 function TabControleQualite({ data }: { data: DashboardData }) {
   const { kpi, controleParEquipe, controleServiceParEquipe, equipes } = data;
   const [tooltip, setTooltip] = useState<{ x: number; y: number; label: string; n: number } | null>(null);
-  const [tooltipCS, setTooltipCS] = useState<{ x: number; y: number; label: string; n: number } | null>(null);
 
-  const controle  = kpi.nb_controle ?? 0;
-  const controleService = kpi.nb_controle_service ?? 0;
-  const realise   = kpi.total_visitees - controle;
-  const restantes = kpi.total_programme - controle - realise;
-  const pctCtrl   = realise > 0 ? (controle / realise * 100) : 0;
-  const pctCtrlCS = realise > 0 ? (controleService / realise * 100) : 0;
+  const controleC  = kpi.nb_controle ?? 0;
+  const controleCS = kpi.nb_controle_service ?? 0;
+  const controle   = controleC + controleCS;
+  const realise    = kpi.total_visitees;
+  const pctCtrl    = realise > 0 ? (controle / realise * 100) : 0;
 
-  const slices = [
-    { label: 'Contrôlées',               value: controle,  color: '#8b5cf6' },
-    { label: 'Réalisées non contrôlées', value: realise,   color: '#10b981' },
-    { label: 'Non réalisées',            value: restantes, color: '#cbd5e1' },
-  ];
-
-  // Build per-equipe stacked data: [non-contrôlées, contrôlées]
+  // Build per-equipe stacked data combining C + CS
   const byNum   = (name: string) => parseInt(name.match(/N°(\d+)/)?.[1] ?? '99');
   const getNum  = (name: string) => { const m = name.match(/N°(\d+)/); return m ? `N°${m[1]}` : ''; };
   const getNoun = (name: string) => {
@@ -1224,12 +1216,17 @@ function TabControleQualite({ data }: { data: DashboardData }) {
     return s;
   };
 
-  const rows = controleParEquipe
-    .map(ce => {
-      const eq = equipes.find(e => e.equipe === ce.equipe);
+  // Merge C and CS counts per equipe
+  const ctrlMap = new Map<string, number>();
+  for (const ce of controleParEquipe) ctrlMap.set(ce.equipe, (ctrlMap.get(ce.equipe) ?? 0) + ce.nb_controle);
+  for (const ce of controleServiceParEquipe) ctrlMap.set(ce.equipe, (ctrlMap.get(ce.equipe) ?? 0) + ce.nb_controle_service);
+
+  const rows = [...ctrlMap.entries()]
+    .map(([equipe, ctrl]) => {
+      const eq = equipes.find(e => e.equipe === equipe);
       const totalVisite = eq?.total_visite ?? 0;
-      const nonCtrl = Math.max(totalVisite - ce.nb_controle, 0);
-      return { equipe: ce.equipe, nonCtrl, ctrl: ce.nb_controle, total: nonCtrl + ce.nb_controle };
+      const nonCtrl = Math.max(totalVisite - ctrl, 0);
+      return { equipe, nonCtrl, ctrl, total: nonCtrl + ctrl };
     })
     .sort((a, b) => byNum(a.equipe) - byNum(b.equipe));
 
@@ -1257,15 +1254,14 @@ function TabControleQualite({ data }: { data: DashboardData }) {
       {/* ── KPI header ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
         {[
-          { label: 'Placettes contrôlées',               value: controle,                 pct: +((controle / (realise + controle || 1)) * 100).toFixed(1), color: '#8b5cf6', bg: 'rgba(139,92,246,0.07)',  sub: '' },
-          { label: 'Placettes non contrôlées', value: realise,                  pct: +((realise  / (realise + controle || 1)) * 100).toFixed(1), color: '#10b981', bg: 'rgba(16,185,129,0.07)',  sub: `` },
-          { label: 'Taux de contrôle',                   value: `${pctCtrl.toFixed(1)}%`, pct: null,                                                       color: '#0284c7', bg: 'rgba(2,132,199,0.07)',   sub: '' },
+          { label: 'Placettes contrôlées',      value: controle,                 pct: +((controle / (realise || 1)) * 100).toFixed(1), color: '#8b5cf6', bg: 'rgba(139,92,246,0.07)' },
+          { label: 'Placettes non contrôlées',   value: realise - controle,       pct: +(((realise - controle) / (realise || 1)) * 100).toFixed(1), color: '#10b981', bg: 'rgba(16,185,129,0.07)' },
+          { label: 'Taux de contrôle',           value: `${pctCtrl.toFixed(1)}%`, pct: null,                                                       color: '#0284c7', bg: 'rgba(2,132,199,0.07)' },
         ].map(s => (
           <div key={s.label} style={{ ...S.card, background: s.bg, padding: '10px 6px 2px', textAlign: 'center', borderLeft: `4px solid ${s.color}` }}>
             <div style={{ fontSize: 10, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>{s.label}</div>
             <div style={{ fontSize: 22, fontWeight: 700, color: s.color, lineHeight: 1 }}>{s.value}</div>
             {s.pct !== null && <div style={{ fontSize: 11, color: s.color, opacity: 0.75, marginTop: 3 }}>{s.pct} %</div>}
-            {(s as any).sub && <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{(s as any).sub}</div>}
           </div>
         ))}
       </div>
@@ -1339,103 +1335,6 @@ function TabControleQualite({ data }: { data: DashboardData }) {
         </div>
       </Card>
 
-      {/* ── Contrôle Service (CS) KPI ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginTop: 8 }}>
-        {[
-          { label: 'Placettes contrôlées (service)',    value: controleService,                       pct: +((controleService / (realise || 1)) * 100).toFixed(1), color: '#d946ef', bg: 'rgba(217,70,239,0.07)' },
-          { label: 'Placettes non contrôlées (service)', value: realise - controleService,             pct: +(((realise - controleService) / (realise || 1)) * 100).toFixed(1), color: '#10b981', bg: 'rgba(16,185,129,0.07)' },
-          { label: 'Taux de contrôle (service)',         value: `${pctCtrlCS.toFixed(1)}%`,            pct: null,                                                                color: '#0284c7', bg: 'rgba(2,132,199,0.07)' },
-        ].map(s => (
-          <div key={s.label} style={{ ...S.card, background: s.bg, padding: '10px 6px 2px', textAlign: 'center', borderLeft: `4px solid ${s.color}` }}>
-            <div style={{ fontSize: 10, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>{s.label}</div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: s.color, lineHeight: 1 }}>{s.value}</div>
-            {s.pct !== null && <div style={{ fontSize: 11, color: s.color, opacity: 0.75, marginTop: 3 }}>{s.pct} %</div>}
-          </div>
-        ))}
-      </div>
-
-      {/* ── Stacked bar chart: contrôle service par équipe ── */}
-      {(() => {
-        const csRows = controleServiceParEquipe
-          .map(ce => {
-            const eq = equipes.find(e => e.equipe === ce.equipe);
-            const totalVisite = eq?.total_visite ?? 0;
-            const nonCtrl = Math.max(totalVisite - ce.nb_controle_service, 0);
-            return { equipe: ce.equipe, nonCtrl, ctrl: ce.nb_controle_service, total: nonCtrl + ce.nb_controle_service };
-          })
-          .sort((a, b) => byNum(a.equipe) - byNum(b.equipe));
-
-        const csYMax  = Math.max(...csRows.map(r => r.total), 1);
-        const csBAR_W  = Math.min(52, Math.floor(cW / csRows.length * 0.55));
-        const csBAR_GAP = Math.floor(cW / csRows.length) - csBAR_W;
-        const csToX = (i: number) => ML + i * (csBAR_W + csBAR_GAP) + csBAR_GAP / 2;
-        const csToY = (v: number) => MT + cH - (v / csYMax) * cH;
-
-        const CS_SEGS = [
-          { key: 'nonCtrl' as const, color: '#10b981', label: 'Réalisées non contrôlées' },
-          { key: 'ctrl'    as const, color: '#d946ef', label: 'Contrôlées (service)' },
-        ];
-
-        return (
-          <Card title="Contrôle qualité effectué par le service pour chaque équipe">
-            <div style={{ position: 'relative' }}>
-              <svg width="100%" viewBox={`0 0 ${VW} ${VH}`} style={{ display: 'block', overflow: 'visible' }}>
-                {Array.from({ length: Y_TICKS + 1 }, (_, i) => {
-                  const val = Math.round((csYMax * i) / Y_TICKS);
-                  const y   = csToY(val);
-                  return (
-                    <g key={i}>
-                      <line x1={ML} x2={VW - MR} y1={y} y2={y}
-                        stroke={i === 0 ? '#94a3b8' : '#e2e8f0'} strokeWidth={i === 0 ? 1.5 : 1} />
-                      <text x={ML - 5} y={y} textAnchor="end" dominantBaseline="middle" fontSize={10} fill="#64748b">{val}</text>
-                    </g>
-                  );
-                })}
-                {csRows.map((r, i) => {
-                  const bx = csToX(i);
-                  let cumY = MT + cH;
-                  return (
-                    <g key={r.equipe}>
-                      {CS_SEGS.map(seg => {
-                        const n  = r[seg.key];
-                        if (n === 0) return null;
-                        const bh = (n / csYMax) * cH;
-                        cumY -= bh;
-                        const segY = cumY;
-                        return (
-                          <rect key={seg.key} x={bx} y={segY} width={csBAR_W} height={bh}
-                            fill={seg.color} rx={0} opacity={0.88} style={{ cursor: 'pointer' }}
-                            onMouseEnter={() => setTooltipCS({ x: bx + csBAR_W / 2 - TW / 2, y: segY - TH - 6, label: `${getNoun(r.equipe)} — ${seg.label}`, n })}
-                            onMouseLeave={() => setTooltipCS(null)} />
-                        );
-                      })}
-                      <text x={bx + csBAR_W / 2} y={csToY(r.total) - 5} textAnchor="middle" fontSize={10} fill="#475569" fontWeight="700">{r.total}</text>
-                      <text x={bx + csBAR_W / 2} y={MT + cH + 14} textAnchor="middle" fontSize={10} fill="#64748b" fontWeight="600">{getNum(r.equipe)}</text>
-                      <text x={bx + csBAR_W / 2} y={MT + cH + 28} textAnchor="middle" fontSize={8.5} fill="#334155">{getNoun(r.equipe)}</text>
-                    </g>
-                  );
-                })}
-                {tooltipCS && (
-                  <g style={{ pointerEvents: 'none' }}>
-                    <rect x={tooltipCS.x} y={tooltipCS.y} width={TW} height={TH} rx={6} fill="#1e293b" opacity={0.93} />
-                    <text x={tooltipCS.x + TW / 2} y={tooltipCS.y + 14} textAnchor="middle" fontSize={10} fill="#94a3b8">{tooltipCS.label}</text>
-                    <text x={tooltipCS.x + TW / 2} y={tooltipCS.y + 32} textAnchor="middle" fontSize={12} fill="#fff" fontWeight="700">{tooltipCS.n} placettes</text>
-                  </g>
-                )}
-              </svg>
-              <div style={{ display: 'flex', gap: 20, justifyContent: 'center', marginTop: 8 }}>
-                {CS_SEGS.map(s => (
-                  <div key={s.key} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#475569' }}>
-                    <div style={{ width: 10, height: 10, borderRadius: 2, background: s.color }} />
-                    {s.label}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </Card>
-        );
-      })()}
-
     </div>
   );
 }
@@ -1490,7 +1389,13 @@ export function Dashboard({ onClose }: Props) {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    // Listen for server-sent "refresh" events (fired on data import or service restart)
+    const es = new EventSource('/api/dashboard/events');
+    es.addEventListener('refresh', () => load());
+    return () => es.close();
+  }, []);
 
   return (
     <div style={S.overlay}>
@@ -1567,7 +1472,7 @@ export function Dashboard({ onClose }: Props) {
             { label: "Taux d'avancement", value: `${Number(data.kpi.pct_avancement).toFixed(1)}%`, color: '#2563eb' },
             { label: 'Moyenne / jour', value: Math.round(Number(data.kpi.moy_par_jour)), sub: 'placettes/jour', color: '#f59e0b' },
             { label: 'Placettes inaccessibles', value: data.accessibilite.global.nb_inaccessible ?? 0, sub: `/ ${data.kpi.total_visitees}`, color: '#ef4444', wrap: true },
-            { label: 'Placettes contrôlées', value: data.kpi.nb_controle ?? 0, sub: `/ ${data.kpi.total_visitees}`, color: '#8b5cf6' },
+            { label: 'Placettes contrôlées', value: (data.kpi.nb_controle ?? 0) + (data.kpi.nb_controle_service ?? 0), sub: `/ ${data.kpi.total_visitees}`, color: '#8b5cf6' },
           ].map((kpi, i) => (
             <div key={i} style={{ ...S.card, position: 'relative', overflow: 'hidden', padding: i === 5 ? '20px 8px 16px' : '20px 16px 16px', textAlign: 'center' }}>
               <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: kpi.color, opacity: 0.6 }} />

@@ -7,6 +7,13 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.ifn.service.RefreshNotifier;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
+import org.springframework.http.MediaType;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -23,6 +30,31 @@ import java.util.Map;
 public class DashboardController {
 
     private final JdbcTemplate jdbc;
+    private final RefreshNotifier refreshNotifier;
+
+    /**
+     * SSE stream — browsers subscribe here to receive "refresh" events.
+     */
+    @GetMapping(value = "/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter subscribe() {
+        return refreshNotifier.subscribe();
+    }
+
+    /**
+     * On service startup, notify all connected browsers to reload.
+     */
+    @EventListener(ApplicationReadyEvent.class)
+    public void onStartup() {
+        refreshNotifier.notifyRefresh();
+    }
+
+    /**
+     * Every day at 00:01 — push a refresh event to all connected browsers.
+     */
+    @Scheduled(cron = "0 1 0 * * *")
+    public void dailyRefresh() {
+        refreshNotifier.notifyRefresh();
+    }
 
     /**
      * GET /api/dashboard/kpi
@@ -44,9 +76,8 @@ public class DashboardController {
         long ctrl   = nbControle        != null ? nbControle        : 0L;
         long ctrlCS = nbControleService  != null ? nbControleService  : 0L;
 
-        // Subtract both control types from visited counts
-        long rawVisitees  = ((Number) kpi.get("total_visitees")).longValue();
-        long totalVisitees = rawVisitees - ctrl - ctrlCS;
+        // v_kpi_global already excludes control plots from total_visitees
+        long totalVisitees = ((Number) kpi.get("total_visitees")).longValue();
         long totalProgramme = ((Number) kpi.get("total_programme")).longValue();
         long nbJours = ((Number) kpi.getOrDefault("nb_jours_terrain", 1L)).longValue();
 
@@ -261,7 +292,7 @@ public class DashboardController {
                 "p.equipe, p.strate_cartographique AS strate, p.essence_group, p.dpanef, " +
                 "p.altitude, p.pente, p.x_repere, p.y_repere, " +
                 "p.description_repere, p.distance_repere, p.azimut_repere, " +
-                "CASE WHEN cs.plot_no  IS NOT NULL THEN 'controle_service' " +
+                "CASE WHEN cs.plot_no  IS NOT NULL THEN 'controle' " +
                 "     WHEN ctrl.plot_no IS NOT NULL THEN 'controle' " +
                 "     WHEN reg.plot_no  IS NOT NULL THEN 'visitee' " +
                 "     ELSE 'programmee' END AS statut, " +

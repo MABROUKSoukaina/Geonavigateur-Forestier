@@ -8,7 +8,7 @@ import { fetchMapGeoJson, type MapFeature } from '../../services/dashboardApi';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const EQUIPE_COLORS = ['#818cf8', '#4ade80', '#f59e0b', '#ec4899', '#38bdf8', '#c084fc'];
+const EQUIPE_COLORS = ['#818cf8', '#4ade80', '#f97316', '#ec4899', '#38bdf8', '#c084fc'];
 
 const ESSENCE_PALETTE = [
   '#0ea5e9', '#8b5cf6', '#f97316', '#10b981', '#ec4899',
@@ -28,7 +28,7 @@ type BasemapId = typeof BASEMAPS[number]['id'];
 type ClassifyMode = 'statut' | 'equipe' | 'essence' | 'accessibilite';
 
 const MODE_LABELS: Record<ClassifyMode, string> = {
-  statut:        'Par statut (réalisée / non réalisée)',
+  statut:        'Par statut (réalisée / en cours)',
   equipe:        'Par équipe',
   essence:       'Par formation',
   accessibilite: 'Par accessibilité',
@@ -49,9 +49,18 @@ function equipeShort(name: string): string {
 
 // ─── DivIcon factories ────────────────────────────────────────────────────────
 
-function makeMarkerIcon(color: string, highlighted: boolean): L.DivIcon {
-  const dot = highlighted ? 12 : 5;
-  const hit = 28; // large transparent hit area for easy clicking
+function zoomToDotSize(zoom: number): number {
+  if (zoom >= 15) return 10;
+  if (zoom >= 13) return 8;
+  if (zoom >= 11) return 6;
+  if (zoom >= 9)  return 5;
+  return 4;
+}
+
+function makeMarkerIcon(color: string, highlighted: boolean, zoom: number): L.DivIcon {
+  const base = zoomToDotSize(zoom);
+  const dot = highlighted ? base + 6 : base;
+  const hit = Math.max(28, dot + 16);
   const glow = highlighted ? `0 0 12px ${color},` : '';
   return L.divIcon({
     className: '',
@@ -69,11 +78,12 @@ function markerColor(f: MapFeature, mode: ClassifyMode, essenceColors: Map<strin
   if (mode === 'accessibilite') {
     if (f.properties.accessibilite === 1) return '#06b6d4';   // accessible — cyan
     if (f.properties.accessibilite === 0) return '#ef4444';   // non accessible — red
-    return '#bcc5d0';                                          // not visited / unknown
+    return '#f97316';                                          // not visited / en cours
   }
   if (f.properties.statut === 'visitee')  return '#10b981';
   if (f.properties.statut === 'controle') return '#8b5cf6';
-  return '#bcc5d0';
+  if (f.properties.statut === 'programmee') return '#f97316';
+  return '#f97316';
 }
 
 // ─── MapFitter ────────────────────────────────────────────────────────────────
@@ -114,6 +124,18 @@ function ResetView({ trigger, features }: { trigger: number; features: { geometr
       );
     }
   }, [trigger, map]);
+  return null;
+}
+
+// ─── ZoomTracker — propagates current zoom level to parent ───────────────────
+function ZoomTracker({ onZoom }: { onZoom: (z: number) => void }) {
+  const map = useMap();
+  useEffect(() => {
+    const handler = () => onZoom(map.getZoom());
+    handler(); // initial
+    map.on('zoomend', handler);
+    return () => { map.off('zoomend', handler); };
+  }, [map, onZoom]);
   return null;
 }
 
@@ -195,6 +217,7 @@ export function TabCarte({ data }: Props) {
   const [flyTarget,    setFlyTarget]    = useState<[number, number] | null>(null);
   const searchRef = useRef<HTMLDivElement>(null);
   const [resetTrigger, setResetTrigger] = useState(0);
+  const [zoom, setZoom] = useState(8);
 
   const toolbarRef = useRef<HTMLDivElement>(null);
 
@@ -300,7 +323,7 @@ export function TabCarte({ data }: Props) {
   const getIconFn = (f: MapFeature): L.DivIcon => {
     const color = markerColor(f, classifyMode, essenceColors);
     const highlighted = f.properties.num_placette === selectedCode;
-    return makeMarkerIcon(highlighted ? '#f59e0b' : color, highlighted);
+    return makeMarkerIcon(highlighted ? '#f97316' : color, highlighted, zoom);
   };
 
   const buildPopupFn = (f: MapFeature): ReactNode => {
@@ -309,7 +332,7 @@ export function TabCarte({ data }: Props) {
     const isControle = statut === 'controle';
     const isVisitee  = statut === 'visitee';
     const isDone     = isVisitee || isControle;
-    const badgeLabel = isControle ? 'Contrôle ✓' : isVisitee ? 'Visitée ✓' : 'Programmée';
+    const badgeLabel = isControle ? 'Contrôle ✓' : isVisitee ? 'Réalisée ✓' : 'En cours';
     return (
       <div style={{ fontFamily: 'system-ui, sans-serif' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 9, paddingBottom: 8, borderBottom: '1px solid #e2e8f0' }}>
@@ -423,7 +446,7 @@ export function TabCarte({ data }: Props) {
                     onChange={toggleVisiteeParent}
                     sx={{ p: 0.3, color: '#cbd5e1', '&.Mui-checked': { color: '#059669' }, '&.MuiCheckbox-indeterminate': { color: '#059669' } }}
                   />
-                  <span style={{ fontSize: 12, fontWeight: 600, color: '#334155', flex: 1 }}>Visitée</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: '#334155', flex: 1 }}>Placettes réalisées</span>
                   <span style={{ fontSize: 10, fontFamily: 'monospace', color: '#64748b' }}>{cntVisitee + cntControle}</span>
                 </label>
 
@@ -436,7 +459,7 @@ export function TabCarte({ data }: Props) {
                     sx={{ p: 0.3, color: '#cbd5e1', '&.Mui-checked': { color: '#8b5cf6' } }}
                   />
                   <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#8b5cf6', display: 'inline-block', flexShrink: 0 }} />
-                  <span style={{ fontSize: 11, color: '#475569', flex: 1 }}>Contrôlée</span>
+                  <span style={{ fontSize: 11, color: '#475569', flex: 1 }}>Placettes contrôlées</span>
                   <span style={{ fontSize: 10, fontFamily: 'monospace', color: cntControle > 0 ? '#64748b' : '#cbd5e1' }}>{cntControle}</span>
                 </label>
 
@@ -449,7 +472,7 @@ export function TabCarte({ data }: Props) {
                     sx={{ p: 0.3, color: '#cbd5e1', '&.Mui-checked': { color: '#10b981' } }}
                   />
                   <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#10b981', display: 'inline-block', flexShrink: 0 }} />
-                  <span style={{ fontSize: 11, color: '#475569', flex: 1 }}>Non contrôlée</span>
+                  <span style={{ fontSize: 11, color: '#475569', flex: 1 }}>Placettes non contrôlées</span>
                   <span style={{ fontSize: 10, fontFamily: 'monospace', color: cntVisitee > 0 ? '#64748b' : '#cbd5e1' }}>{cntVisitee}</span>
                 </label>
 
@@ -459,10 +482,10 @@ export function TabCarte({ data }: Props) {
                     size="small"
                     checked={selStatuts.has('programmee')}
                     onChange={() => toggleStatut('programmee')}
-                    sx={{ p: 0.3, color: '#cbd5e1', '&.Mui-checked': { color: '#94a3b8' } }}
+                    sx={{ p: 0.3, color: '#cbd5e1', '&.Mui-checked': { color: '#f97316' } }}
                   />
-                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#94a3b8', display: 'inline-block', flexShrink: 0 }} />
-                  <span style={{ fontSize: 12, fontWeight: 600, color: '#334155', flex: 1 }}>Non Visitée</span>
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#f97316', display: 'inline-block', flexShrink: 0 }} />
+                  <span style={{ fontSize: 12, fontWeight: 600, color: '#334155', flex: 1 }}>Placettes en cours</span>
                   <span style={{ fontSize: 10, fontFamily: 'monospace', color: cntProg > 0 ? '#64748b' : '#cbd5e1' }}>{cntProg}</span>
                 </label>
               </DropPanel>
@@ -575,9 +598,9 @@ export function TabCarte({ data }: Props) {
                 )}
               </div>
               {[
-                { key: '1',    label: 'Accessible',      color: '#06b6d4' },
-                { key: '0',    label: 'Non accessible',  color: '#ef4444' },
-                { key: 'null', label: 'Non réalisées',   color: '#94a3b8' },
+                { key: '1',    label: 'Placettes accessibles',      color: '#06b6d4' },
+                { key: '0',    label: 'Placettes non accessibles',  color: '#ef4444' },
+                { key: 'null', label: 'Placettes en cours',   color: '#f97316' },
               ].map(({ key, label, color }) => {
                 const count = allFeatures.filter(f => String(f.properties.accessibilite) === key).length;
                 return (
@@ -688,22 +711,16 @@ export function TabCarte({ data }: Props) {
 
                 {classifyMode === 'statut' && (
                   <>
-                    {/* Réalisée — label only, no dot */}
-                    <div style={{ marginBottom: 4 }}>
-                      <span style={{ fontSize: 11, color: '#1e293b', fontWeight: 600 }}>Réalisée</span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 4, paddingLeft: 12 }}>
-                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#10b981', flexShrink: 0, display: 'inline-block' }} />
-                      <span style={{ fontSize: 10, color: '#475569' }}>Non contrôlée</span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 7, paddingLeft: 12 }}>
-                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#8b5cf6', flexShrink: 0, display: 'inline-block' }} />
-                      <span style={{ fontSize: 10, color: '#475569' }}>Contrôlée</span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#bcc5d0', flexShrink: 0, display: 'inline-block' }} />
-                      <span style={{ fontSize: 11, color: '#1e293b', fontWeight: 600 }}>Non réalisée</span>
-                    </div>
+                    {[
+                      { color: '#10b981', label: 'Placettes réalisées' },
+                      { color: '#8b5cf6', label: 'Placettes contrôlées' },
+                      { color: '#f97316', label: 'Placettes en cours' },
+                    ].map(({ color, label }) => (
+                      <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 5 }}>
+                        <span style={{ width: 9, height: 9, borderRadius: '50%', background: color, flexShrink: 0, display: 'inline-block' }} />
+                        <span style={{ fontSize: 11, color: '#334155' }}>{label}</span>
+                      </div>
+                    ))}
                   </>
                 )}
 
@@ -724,9 +741,9 @@ export function TabCarte({ data }: Props) {
                 {classifyMode === 'accessibilite' && (
                   <>
                     {[
-                      { color: '#06b6d4', label: 'Accessible' },
-                      { color: '#ef4444', label: 'Non accessible' },
-                      { color: '#bcc5d0', label: 'Non réalisées' },
+                      { color: '#06b6d4', label: 'Placettes accessibles' },
+                      { color: '#ef4444', label: 'Placettes non accessibles' },
+                      { color: '#f97316', label: 'Placettes en cours' },
                     ].map(({ color, label }) => (
                       <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 5 }}>
                         <span style={{ width: 9, height: 9, borderRadius: '50%', background: color, flexShrink: 0, display: 'inline-block' }} />
@@ -803,7 +820,7 @@ export function TabCarte({ data }: Props) {
                 ) : searchResults.map(f => {
                   const isSelected = f.properties.num_placette === selectedCode;
                   const statut = f.properties.statut;
-                  const dotColor = statut === 'visitee' ? '#10b981' : statut === 'controle' ? '#8b5cf6' : '#bcc5d0';
+                  const dotColor = statut === 'visitee' ? '#10b981' : statut === 'controle' ? '#8b5cf6' : '#f97316';
                   return (
                     <button key={f.properties.num_placette}
                       onMouseDown={() => {
@@ -819,7 +836,7 @@ export function TabCarte({ data }: Props) {
                         width: '100%', border: 'none', cursor: 'pointer', textAlign: 'left',
                         padding: '7px 12px',
                         background: isSelected ? 'rgba(245,158,11,0.08)' : 'transparent',
-                        borderLeft: isSelected ? '3px solid #f59e0b' : '3px solid transparent',
+                        borderLeft: isSelected ? '3px solid #f97316' : '3px solid transparent',
                       }}>
                       <span style={{ width: 7, height: 7, borderRadius: '50%', background: dotColor, flexShrink: 0, display: 'inline-block' }} />
                       <span style={{ fontSize: 12, fontWeight: isSelected ? 700 : 500, color: '#1e293b', flex: 1 }}>
@@ -882,6 +899,7 @@ export function TabCarte({ data }: Props) {
           {!loading && filtered.length > 0 && <MapFitter features={filtered} />}
           <MapFlyer target={flyTarget} />
           <ResetView trigger={resetTrigger} features={allFeatures} />
+          <ZoomTracker onZoom={setZoom} />
 
           {!loading && filtered.map(f => {
             const [lon, lat] = f.geometry.coordinates;

@@ -62,7 +62,7 @@ export interface MapFeature {
     description_repere: string | null;
     distance_repere: number | null;
     azimut_repere: number | null;
-    statut: 'visitee' | 'programmee' | 'controle' | 'controle_service';
+    statut: 'visitee' | 'programmee' | 'controle';
     accessibilite: number | null;
     a_pied: number | null;
     date_modified: string | null;

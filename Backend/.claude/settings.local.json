@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(netstat -ano)",
+      "Bash(findstr \":8080\")",
+      "Bash(findstr \"LISTENING\")",
+      "Bash(xargs ls -t)",
+      "Bash(PGPASSWORD=postgres psql -h localhost -U postgres -d IFN_2026 -c \"SELECT * FROM v_kpi_global;\")",
+      "Bash(PGPASSWORD=postgres psql -h localhost -U postgres -d \"IFN_2026\" -c \"SELECT COUNT\\(*\\) FROM plot WHERE plot_no NOT LIKE ''%C'';\")",
+      "Bash(python -c \":*)",
+      "Bash(python3 -c \":*)",
+      "Bash(psql -U postgres -d IFN_2026 -c \"\\\\d ifn_programme\")",
+      "Bash(psql -U postgres -d IFN_2026 -f \"c:\\\\Users\\\\SEIFN\\\\Desktop\\\\Inventaire dendro\\\\geonav-pro_V6\\\\Geonavigateur Forestier\\\\Backend\\\\src\\\\main\\\\resources\\\\db\\\\add_dates_plot.sql\")",
+      "Bash(PGPASSWORD=postgres psql -U postgres -d IFN_2026 -f \"c:\\\\Users\\\\SEIFN\\\\Desktop\\\\Inventaire dendro\\\\geonav-pro_V6\\\\Geonavigateur Forestier\\\\Backend\\\\src\\\\main\\\\resources\\\\db\\\\import_plot_csv.sql\")",
+      "Bash(python3 -:*)",
+      "Read(//c/Users/SEIFN/Desktop/Inventaire dendro/geonav-pro_V6/Geonavigateur Forestier/Frontend/**)",
+      "Bash(npx tsc --noEmit)",
+      "Bash(npx --prefix \"c:\\\\Users\\\\SEIFN\\\\Desktop\\\\Inventaire dendro\\\\geonav-pro_V6\\\\Geonavigateur Forestier\\\\Frontend\" tsc --noEmit)",
+      "Read(//d c:/Users/SEIFN/Desktop/Inventaire dendro/geonav-pro_V6/Geonavigateur Forestier/**)",
+      "Bash(npx tsc -p tsconfig.app.json --noEmit)",
+      "Bash(npx tsc -p \"c:\\\\Users\\\\SEIFN\\\\Desktop\\\\Inventaire dendro\\\\geonav-pro_V6\\\\Geonavigateur Forestier\\\\Frontend\\\\tsconfig.app.json\" --noEmit)",
+      "Bash(PGPASSWORD=postgres \"/c/Program Files/PostgreSQL/16/bin/psql.exe\" -U postgres -d collect_ifn -f \"C:/Users/SEIFN/Desktop/import_ofc.sql\")",
+      "Bash(PGPASSWORD=postgres \"/c/Program Files/PostgreSQL/16/bin/psql.exe\" -U postgres -d IFN_2026 -t -c \":*)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\SEIFN\\Desktop"
+    ]
+  }
+}

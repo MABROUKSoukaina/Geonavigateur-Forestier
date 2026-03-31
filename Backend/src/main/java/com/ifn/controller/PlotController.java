@@ -2,6 +2,7 @@ package com.ifn.controller;
 
 import com.ifn.entity.Plot;
 import com.ifn.service.PlotService;
+import com.ifn.service.RefreshNotifier;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -23,6 +24,7 @@ import java.util.Map;
 public class PlotController {
 
     private final PlotService service;
+    private final RefreshNotifier refreshNotifier;
 
     /**
      * GET /api/plots
@@ -77,6 +79,7 @@ public class PlotController {
         }
         try {
             Map<String, Integer> result = service.importCsv(file);
+            refreshNotifier.notifyRefresh();
             return ResponseEntity.ok(result);
         } catch (IOException e) {
             return ResponseEntity.internalServerError().body(Map.of("inserted", -1, "updated", -1));
