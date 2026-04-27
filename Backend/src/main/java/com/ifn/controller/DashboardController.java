@@ -41,11 +41,14 @@ public class DashboardController {
     }
 
     /**
-     * On service startup, notify all connected browsers to reload.
+     * On service startup, wait 5 seconds for browsers to reconnect then notify them.
      */
     @EventListener(ApplicationReadyEvent.class)
     public void onStartup() {
-        refreshNotifier.notifyRefresh();
+        new Thread(() -> {
+            try { Thread.sleep(5_000); } catch (InterruptedException ignored) {}
+            refreshNotifier.notifyRefresh();
+        }).start();
     }
 
     /**
@@ -105,9 +108,9 @@ public class DashboardController {
                 "  COUNT(prog.num_placette) - COALESCE(SUM(CASE WHEN pl.plot_no IS NOT NULL THEN 1 ELSE 0 END), 0) AS restantes, " +
                 "  ROUND(COALESCE(SUM(CASE WHEN pl.plot_no IS NOT NULL THEN 1 ELSE 0 END), 0) " +
                 "        * 100.0 / NULLIF(COUNT(prog.num_placette), 0), 1)                    AS pct_avancement, " +
-                "  COUNT(DISTINCT DATE(pl.date_modified))                                     AS nb_jours, " +
+                "  COUNT(DISTINCT DATE(pl.date_created))                                      AS nb_jours, " +
                 "  ROUND(COALESCE(SUM(CASE WHEN pl.plot_no IS NOT NULL THEN 1 ELSE 0 END), 0) * 1.0 / " +
-                "        NULLIF(COUNT(DISTINCT DATE(pl.date_modified)), 0), 1)                AS moy_par_jour " +
+                "        NULLIF(COUNT(DISTINCT DATE(pl.date_created)), 0), 1)                 AS moy_par_jour " +
                 "FROM ifn_programme prog " +
                 "LEFT JOIN plot pl ON pl.plot_no = prog.num_placette AND pl.plot_no NOT LIKE '%C' AND pl.plot_no NOT LIKE '%CS' " +
                 "WHERE prog.equipe IS NOT NULL " +
@@ -201,12 +204,12 @@ public class DashboardController {
                 "SELECT prog.equipe, " +
                 "  COUNT(prog.num_placette)                                                  AS total_affecte, " +
                 "  COUNT(pl.plot_no)                                                         AS total_visite, " +
-                "  COUNT(DISTINCT DATE(pl.date_modified))                                    AS nb_jours, " +
+                "  COUNT(DISTINCT DATE(pl.date_created))                                     AS nb_jours, " +
                 "  ROUND(COUNT(pl.plot_no) * 1.0 / " +
-                "        NULLIF(COUNT(DISTINCT DATE(pl.date_modified)), 0), 1)               AS moy_par_jour, " +
+                "        NULLIF(COUNT(DISTINCT DATE(pl.date_created)), 0), 1)                AS moy_par_jour, " +
                 "  CEIL((COUNT(prog.num_placette) - COUNT(pl.plot_no)) * 1.0 / " +
                 "       NULLIF(ROUND(COUNT(pl.plot_no) * 1.0 / " +
-                "              NULLIF(COUNT(DISTINCT DATE(pl.date_modified)), 0), 1), 0))    AS jours_restants_estimes " +
+                "              NULLIF(COUNT(DISTINCT DATE(pl.date_created)), 0), 1), 0))     AS jours_restants_estimes " +
                 "FROM ifn_programme prog " +
                 "LEFT JOIN plot pl ON pl.plot_no = prog.num_placette AND pl.plot_no NOT LIKE '%C' AND pl.plot_no NOT LIKE '%CS' " +
                 "WHERE prog.equipe IS NOT NULL " +

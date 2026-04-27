@@ -16,6 +16,7 @@ const TABS: { key: TabType; label: string }[] = [
 
 interface SidebarProps { onShowDashboard?: () => void; }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function Sidebar({ onShowDashboard }: SidebarProps) {
   const navigate = useNavigate();
   const { routingMode, setRoutingMode, activeTab, setActiveTab,

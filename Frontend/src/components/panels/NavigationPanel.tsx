@@ -102,6 +102,7 @@ export function NavigationPanel() {
   const [birdInfo, setBirdInfo] = useState<{ bearing: number; direction: string } | null>(null);
   const [routeSource, setRouteSource] = useState<string>('');
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const offlineReady = isOfflineRouterReady();
   const placetteItems = useMemo(() => placettes.map((p) => ({ code: p.code, label: p.code })), [placettes]);
   const repereItems = useMemo(() => placettes.filter((p) => p.repere).map((p) => ({ code: p.code, label: `Repère ${p.code}` })), [placettes]);

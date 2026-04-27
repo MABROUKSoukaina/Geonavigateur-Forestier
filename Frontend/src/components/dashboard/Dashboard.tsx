@@ -1,19 +1,20 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import type {
-  DashboardData, AvancementEquipe, AvancementEssence, AccessibiliteEquipe, ProductiviteEquipe, StrateParEquipe,
+  DashboardData, AvancementEquipe, AvancementEssence, AccessibiliteEquipe, ProductiviteEquipe, StrateParEquipe, MoyJourEquipe,
 } from '../../services/dashboardApi';
 import { fetchDashboardData, importPlotsCsv } from '../../services/dashboardApi';
 import { TabCarte } from './TabCarte';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const EQUIPE_COLORS = ['#818cf8', '#4ade80', '#f59e0b', '#ec4899', '#38bdf8', '#c084fc'];
-const BAR_COLORS    = ['#4ade80', '#38bdf8', '#f59e0b', '#c084fc', '#ef4444', '#fb923c'];
+const EQUIPE_COLORS = ['#a5b4fc', '#86efac', '#fbbf24', '#f472b6', '#7dd3fc', '#d8b4fe'];
+const BAR_COLORS    = ['#86efac', '#7dd3fc', '#fbbf24', '#d8b4fe', '#f87171', '#fdba74'];
 const ESSENCE_COLORS = [
-  '#0ea5e9', '#8b5cf6', '#f97316', '#10b981', '#ec4899',
-  '#eab308', '#06b6d4', '#84cc16', '#f43f5e', '#a78bfa',
-  '#fb923c', '#34d399', '#60a5fa', '#f472b6', '#a3e635',
+  '#38bdf8', '#d946ef', '#fb923c', '#34d399', '#f472b6',
+  '#facc15', '#22d3ee', '#bef264', '#fb7185', '#c4b5fd',
+  '#fdba74', '#6ee7b7', '#93c5fd', '#f9a8d4', '#bef264',
 ];
 
 
@@ -22,7 +23,20 @@ function equipeNum(name: string): number {
   return m ? parseInt(m[1]) : 99;
 }
 function equipeIndex(name: string): number { return (equipeNum(name) - 1) % EQUIPE_COLORS.length; }
-function equipeColor(name: string): string { return EQUIPE_COLORS[equipeIndex(name)]; }
+function lightenHex(hex: string, factor = 0.35): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  const nr = Math.min(255, Math.round(r + (255 - r) * factor));
+  const ng = Math.min(255, Math.round(g + (255 - g) * factor));
+  const nb = Math.min(255, Math.round(b + (255 - b) * factor));
+  return `#${nr.toString(16).padStart(2, '0')}${ng.toString(16).padStart(2, '0')}${nb.toString(16).padStart(2, '0')}`;
+}
+function equipeColor(name: string): string {
+  const base = EQUIPE_COLORS[equipeIndex(name)];
+  if (name.includes('Maâmora') || name.includes('Maamora')) return lightenHex(base);
+  return base;
+}
 function equipeShort(name: string): string {
   const m = name.match(/Equipe\s+(.+?)\s+\(/);
   const s = m ? m[1] : name;
@@ -38,21 +52,21 @@ const S = {
   overlay: {
     position: 'fixed' as const, inset: 0, zIndex: 3000,
     display: 'flex', flexDirection: 'column' as const,
-    background: '#f0f4f8', color: '#1e293b',
+    background: '#0d1b2a', color: '#edf1f5',
     fontFamily: "'DM Sans', system-ui, sans-serif",
   },
   header: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '20px 32px', borderBottom: '1px solid #e2e8f0',
-    background: 'linear-gradient(180deg, rgba(16,185,129,0.05) 0%, transparent 100%)',
+    padding: '20px 32px', borderBottom: '1px solid rgba(255,255,255,0.08)',
+    background: 'linear-gradient(180deg, rgba(16,185,129,0.07) 0%, transparent 100%)',
     flexShrink: 0,
   },
   card: {
-    background: '#ffffff', border: '1px solid #e2e8f0',
+    background: '#162035', border: '1px solid rgba(255,255,255,0.08)',
     borderRadius: 12, padding: 24,
   },
   innerCard: {
-    background: '#f1f5f9', borderRadius: 10, padding: '8px 12px',
+    background: '#0b1629', borderRadius: 10, padding: '8px 12px',
   },
   iconBtn: {
     background: 'none', border: 'none', cursor: 'pointer',
@@ -65,7 +79,7 @@ const S = {
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function ProgressRing({ pct, size = 80, stroke = 6, color = '#4ade80' }: {
+function ProgressRing({ pct, size = 80, stroke = 6, color = '#86efac' }: {
   pct: number; size?: number; stroke?: number; color?: string;
 }) {
   const r = (size - stroke) / 2;
@@ -74,7 +88,7 @@ function ProgressRing({ pct, size = 80, stroke = 6, color = '#4ade80' }: {
   return (
     <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
       <circle cx={size / 2} cy={size / 2} r={r} fill="none"
-        stroke="rgba(0,0,0,0.08)" strokeWidth={stroke} />
+        stroke="rgba(255,255,255,0.12)" strokeWidth={stroke} />
       <circle cx={size / 2} cy={size / 2} r={r} fill="none"
         stroke={color} strokeWidth={stroke}
         strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
@@ -83,20 +97,20 @@ function ProgressRing({ pct, size = 80, stroke = 6, color = '#4ade80' }: {
   );
 }
 
-function BarH({ label, value, max, count, color = '#4ade80' }: {
+function BarH({ label, value, max, count, color = '#86efac' }: {
   label: string; value: number; max: number; count?: number; color?: string;
 }) {
   const pct = max > 0 ? (value / max) * 100 : 0;
   return (
     <div style={{ marginBottom: 12 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 12 }}>
-        <span style={{ color: '#334155', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: 8 }}>{label}</span>
-        <span style={{ color: '#64748b', fontFamily: 'monospace', fontSize: 11, flexShrink: 0 }}>
+        <span style={{ color: '#dde4ec', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: 8 }}>{label}</span>
+        <span style={{ color: '#bac4d0', fontFamily: 'monospace', fontSize: 11, flexShrink: 0 }}>
           {count !== undefined ? `${value}/${count}` : value}
           <span style={{ marginLeft: 4, color: '#94a3b8' }}>({pct.toFixed(1)}%)</span>
         </span>
       </div>
-      <div style={{ height: 6, background: 'rgba(0,0,0,0.07)', borderRadius: 3, overflow: 'hidden' }}>
+      <div style={{ height: 6, background: 'rgba(255,255,255,0.1)', borderRadius: 3, overflow: 'hidden' }}>
         <div style={{ width: `${pct}%`, background: color, height: '100%', borderRadius: 3, transition: 'width 0.8s ease' }} />
       </div>
     </div>
@@ -107,18 +121,21 @@ function StatBox({ label, value, color = '#e4e7ef', sub }: {
   label: string; value: string | number; color?: string; sub?: string;
 }) {
   return (
-    <div style={{ background: '#f1f5f9', borderRadius: 10, padding: 12, textAlign: 'center' }}>
-      <p style={{ fontSize: 10, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>{label}</p>
+    <div style={{ background: '#0b1629', borderRadius: 10, padding: 12, textAlign: 'center' }}>
+      <p style={{ fontSize: 10, color: '#bac4d0', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>{label}</p>
       <p style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 20, color }}>{value}</p>
       {sub && <p style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>{sub}</p>}
     </div>
   );
 }
 
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
+function Card({ title, children, action }: { title: string; children: React.ReactNode; action?: React.ReactNode }) {
   return (
     <div style={S.card}>
-      <h3 style={{ fontSize: 14, fontWeight: 600, color: '#1e293b', marginBottom: 16 }}>{title}</h3>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <h3 style={{ fontSize: 14, fontWeight: 600, color: '#edf1f5', margin: 0 }}>{title}</h3>
+        {action}
+      </div>
       {children}
     </div>
   );
@@ -164,11 +181,11 @@ function DonutChart({ equipes, totalOverride }: { equipes: AvancementEquipe[]; t
             return s.isCircle ? (
               <g key={i}>
                 <circle cx={cx} cy={cy} r={outerR} fill={s.color} />
-                <circle cx={cx} cy={cy} r={innerR} fill="#fff" />
+                <circle cx={cx} cy={cy} r={innerR} fill="#0d1b2a" />
               </g>
             ) : (
               <path
-                key={i} d={s.d} fill={s.color} stroke="#fff"
+                key={i} d={s.d} fill={s.color} stroke="#0d1b2a"
                 strokeWidth={isHov ? 3 : 2.5}
                 style={{
                   cursor: 'pointer',
@@ -193,7 +210,7 @@ function DonutChart({ equipes, totalOverride }: { equipes: AvancementEquipe[]; t
             </>
           ) : (
             <>
-              <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 20, color: '#1e293b' }}>{total.toLocaleString()}</span>
+              <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 20, color: '#edf1f5' }}>{total.toLocaleString()}</span>
               <span style={{ fontSize: 10, color: '#94a3b8', marginTop: 1 }}>placettes</span>
             </>
           )}
@@ -214,7 +231,7 @@ function DonutChart({ equipes, totalOverride }: { equipes: AvancementEquipe[]; t
             onMouseLeave={() => setHovered(null)}
           >
             <div style={{ width: 9, height: 9, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
-            <span style={{ fontSize: 11, color: '#334155' }}>{equipeShort(s.eq.equipe)}</span>
+            <span style={{ fontSize: 11, color: '#dde4ec' }}>{equipeShort(s.eq.equipe)}</span>
             <span style={{ fontFamily: 'monospace', fontSize: 10, color: '#94a3b8' }}>{s.pct.toFixed(1)}%</span>
           </div>
         ))}
@@ -268,11 +285,11 @@ function EssenceDonutChart({ essences }: { essences: AvancementEssence[] }) {
             return s.isCircle ? (
               <g key={i}>
                 <circle cx={cx} cy={cy} r={outerR} fill={s.color} />
-                <circle cx={cx} cy={cy} r={innerR} fill="#fff" />
+                <circle cx={cx} cy={cy} r={innerR} fill="#0d1b2a" />
               </g>
             ) : (
               <path
-                key={i} d={s.d} fill={s.color} stroke="#fff"
+                key={i} d={s.d} fill={s.color} stroke="#0d1b2a"
                 strokeWidth={isHov ? 3 : 2.5}
                 style={{
                   cursor: 'pointer',
@@ -295,7 +312,7 @@ function EssenceDonutChart({ essences }: { essences: AvancementEssence[] }) {
             </>
           ) : (
             <>
-              <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 20, color: '#1e293b' }}>{total.toLocaleString()}</span>
+              <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 20, color: '#edf1f5' }}>{total.toLocaleString()}</span>
               <span style={{ fontSize: 10, color: '#94a3b8', marginTop: 1 }}>visitées</span>
             </>
           )}
@@ -316,7 +333,7 @@ function EssenceDonutChart({ essences }: { essences: AvancementEssence[] }) {
             onMouseLeave={() => setHovered(null)}
           >
             <div style={{ width: 9, height: 9, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
-            <span style={{ fontSize: 11, color: '#334155' }}>{s.ess.essence}</span>
+            <span style={{ fontSize: 11, color: '#dde4ec' }}>{s.ess.essence}</span>
             <span style={{ fontFamily: 'monospace', fontSize: 10, color: '#94a3b8' }}>{s.pct.toFixed(1)}%</span>
           </div>
         ))}
@@ -327,6 +344,7 @@ function EssenceDonutChart({ essences }: { essences: AvancementEssence[] }) {
 
 // ─── Tab panels ───────────────────────────────────────────────────────────────
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function TabGlobal({ data }: { data: DashboardData }) {
   const { kpi, essences } = data;
   const pct = Number(kpi.pct_avancement);
@@ -337,16 +355,16 @@ function TabGlobal({ data }: { data: DashboardData }) {
       <Card title="Avancement global">
         <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
           <div style={{ position: 'relative', flexShrink: 0 }}>
-            <ProgressRing pct={pct} size={120} stroke={10} color="#059669" />
+            <ProgressRing pct={pct} size={120} stroke={10} color="#10b981" />
             <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 22, color: '#059669' }}>{pct.toFixed(1)}%</span>
+              <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 22, color: '#10b981' }}>{pct.toFixed(1)}%</span>
             </div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, flex: 1 }}>
-            <StatBox label="Programmées" value={kpi.total_programme} color="#64748b" />
-            <StatBox label="Réalisées" value={kpi.total_visitees} color="#059669" />
-            <StatBox label="Restantes" value={kpi.restantes ?? kpi.total_programme - kpi.total_visitees} color="#dc2626" />
-            <StatBox label="Jours terrain" value={kpi.nb_jours_terrain} color="#0284c7" />
+            <StatBox label="Programmées" value={kpi.total_programme} color="#7a8a9c" />
+            <StatBox label="Réalisées" value={kpi.total_visitees} color="#10b981" />
+            <StatBox label="Restantes" value={kpi.restantes ?? kpi.total_programme - kpi.total_visitees} color="#ef4444" />
+            <StatBox label="Jours terrain" value={kpi.nb_jours_terrain} color="#0ea5e9" />
           </div>
         </div>
       </Card>
@@ -370,6 +388,10 @@ function TabGlobal({ data }: { data: DashboardData }) {
 function TabEquipe({ data }: { data: DashboardData }) {
   const equipes = sortByNum(data.equipes);
   const totalProgramme = data.kpi.total_programme;
+  const productivite = sortByNum(data.temporel.productivite);
+  const moyGlobale = productivite.length > 0
+    ? productivite.reduce((s: number, eq: ProductiviteEquipe) => s + Number(eq.moy_par_jour || 0), 0) / productivite.length
+    : 0;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
@@ -395,12 +417,12 @@ function TabEquipe({ data }: { data: DashboardData }) {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, textAlign: 'center', fontSize: 11 }}>
                 {[
                   { label: 'Total', val: eq.total_affecte, color: undefined },
-                  { label: 'Réalisées', val: eq.total_visite, color: '#059669' },
-                  { label: 'Restantes', val: eq.restantes, color: '#ef4444' },
+                  { label: 'Réalisées', val: eq.total_visite, color: '#10b981' },
+                  { label: 'Restantes', val: eq.restantes, color: '#f87171' },
                 ].map(({ label, val, color: c }) => (
-                  <div key={label} style={{ background: '#f1f5f9', borderRadius: 8, padding: '8px 4px' }}>
+                  <div key={label} style={{ background: '#0b1629', borderRadius: 8, padding: '8px 4px' }}>
                     <p style={{ color: '#94a3b8', fontSize: 9, marginBottom: 2 }}>{label}</p>
-                    <p style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 16, color: c ?? '#1e293b' }}>{val}</p>
+                    <p style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 16, color: c ?? '#edf1f5' }}>{val}</p>
                   </div>
                 ))}
               </div>
@@ -408,8 +430,51 @@ function TabEquipe({ data }: { data: DashboardData }) {
           );
         })}
       </div>
+      {/* Per-team productivity */}
+      <Card title="Moyenne des placettes réalisées par équipe">
+        <div style={{ position: 'relative' }}>
+          <div style={{
+            position: 'absolute', top: -38, right: 0, zIndex: 1,
+            display: 'flex', alignItems: 'center', gap: 6,
+            background: 'rgba(37,99,235,0.15)', border: '1px solid rgba(37,99,235,0.4)',
+            borderRadius: 8, padding: '3px 10px',
+          }}>
+            <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 15, color: '#93c5fd' }}>{moyGlobale.toFixed(1)}</span>
+            <span style={{ fontSize: 10, color: '#93c5fd' }}>moyenne globale / jour</span>
+          </div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 10 }}>
+          {productivite.map((eq: ProductiviteEquipe) => {
+            const color = equipeColor(eq.equipe);
+            return (
+              <div key={eq.equipe} style={{ ...S.innerCard, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: color, flexShrink: 0 }} />
+                  <p style={{ fontSize: 13, fontWeight: 600 }}>{equipeShort(eq.equipe)}</p>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+                  <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 24, color }}>{Number(eq.moy_par_jour).toFixed(1)}</span>
+                  <span style={{ color: '#7a8a9c', fontSize: 12 }}>/ jour</span>
+                </div>
+                <p style={{ fontSize: 11, color: '#94a3b8' }}>
+                  {eq.total_visite} réalisées · {eq.nb_jours} jours travaillés
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      </Card>
+
       <Card title="Répartition des placettes par équipe">
         <DonutChart equipes={equipes} totalOverride={totalProgramme} />
+      </Card>
+
+      <Card title="Essences collectées par équipe">
+        <StrateParEquipeChart rows={data.stratesParEquipe} />
+      </Card>
+
+      <Card title="Distribution des essences réalisées">
+        <EssenceDonutChart essences={data.essences} />
       </Card>
     </div>
   );
@@ -418,13 +483,13 @@ function TabEquipe({ data }: { data: DashboardData }) {
 // ─── Stacked bar: essences collected per équipe ───────────────────────────────
 
 const STRATE_COLORS = [
-  '#0ea5e9', '#8b5cf6', '#f97316', '#10b981', '#ec4899',
-  '#eab308', '#06b6d4', '#f43f5e', '#a78bfa', '#fb923c',
-  '#34d399', '#60a5fa', '#f472b6', '#a3e635', '#4ade80',
+  '#38bdf8', '#d946ef', '#fb923c', '#34d399', '#f472b6',
+  '#facc15', '#22d3ee', '#fb7185', '#c4b5fd', '#fdba74',
+  '#6ee7b7', '#93c5fd', '#f9a8d4', '#bef264', '#86efac',
 ];
 
 function StrateParEquipeChart({ rows }: { rows: StrateParEquipe[] }) {
-  const [tooltip, setTooltip] = useState<{ x: number; y: number; equipe: string; essence: string; n: number } | null>(null);
+  const [tooltip, setTooltip] = useState<{ cx: number; cy: number; equipe: string; essence: string; n: number } | null>(null);
 
   if (rows.length === 0) return <p style={{ color: '#94a3b8', fontSize: 14, textAlign: 'center', padding: '32px 0' }}>Aucune donnée</p>;
 
@@ -487,8 +552,8 @@ function StrateParEquipeChart({ rows }: { rows: StrateParEquipe[] }) {
             return (
               <g key={i}>
                 <line x1={ML} x2={VW - MR} y1={y} y2={y}
-                  stroke={i === 0 ? '#94a3b8' : '#e2e8f0'} strokeWidth={i === 0 ? 1.5 : 1} />
-                <text x={ML - 5} y={y} textAnchor="end" dominantBaseline="middle" fontSize={10} fill="#64748b">{val}</text>
+                  stroke={i === 0 ? '#94a3b8' : 'rgba(255,255,255,0.08)'} strokeWidth={i === 0 ? 1.5 : 1} />
+                <text x={ML - 5} y={y} textAnchor="end" dominantBaseline="middle" fontSize={10} fill="#7a8a9c">{val}</text>
               </g>
             );
           })}
@@ -509,48 +574,49 @@ function StrateParEquipeChart({ rows }: { rows: StrateParEquipe[] }) {
                     <rect key={e} x={bx} y={segY} width={BAR_W} height={bh}
                       fill={essColor[e]} rx={0} opacity={0.88}
                       style={{ cursor: 'pointer' }}
-                      onMouseEnter={() => setTooltip({ x: bx + BAR_W / 2 - TW / 2, y: segY - TH - 6, equipe: eq, essence: e, n })}
+                      onMouseEnter={ev => setTooltip({ cx: ev.clientX, cy: ev.clientY, equipe: eq, essence: e, n })}
                       onMouseLeave={() => setTooltip(null)} />
                   );
                 })}
 
                 {/* Total above bar */}
                 <text x={bx + BAR_W / 2} y={toY(totals[eq]) - 5}
-                  textAnchor="middle" fontSize={10} fill="#475569" fontWeight="700">
+                  textAnchor="middle" fontSize={10} fill="#bac4d0" fontWeight="700">
                   {totals[eq]}
                 </text>
 
                 {/* Equipe number — centered, straight */}
                 <text x={bx + BAR_W / 2} y={MT + cH + 14}
-                  textAnchor="middle" fontSize={10} fill="#64748b" fontWeight="600">
+                  textAnchor="middle" fontSize={10} fill="#bac4d0" fontWeight="600">
                   {getNum(eq)}
                 </text>
                 {/* Equipe noun — horizontal, smaller font */}
                 <text x={bx + BAR_W / 2} y={MT + cH + 28}
-                  textAnchor="middle" fontSize={8.5} fill="#334155">
+                  textAnchor="middle" fontSize={8.5} fill="#dde4ec">
                   {getNoun(eq)}
                 </text>
               </g>
             );
           })}
 
-          {/* Tooltip */}
-          {tooltip && (
-            <g style={{ pointerEvents: 'none' }}>
-              <rect x={tooltip.x} y={tooltip.y} width={TW} height={TH} rx={6} fill="#1e293b" opacity={0.93} />
-              <text x={tooltip.x + TW / 2} y={tooltip.y + 14} textAnchor="middle" fontSize={10} fill="#94a3b8">{getNoun(tooltip.equipe)}</text>
-              <text x={tooltip.x + TW / 2} y={tooltip.y + 32} textAnchor="middle" fontSize={12} fill="#fff" fontWeight="700">
-                {tooltip.essence} — {tooltip.n} placettes
-              </text>
-            </g>
-          )}
         </svg>
       </div>
+
+      {tooltip && (
+        <div style={{
+          position: 'fixed', left: tooltip.cx - TW / 2, top: tooltip.cy - TH - 10,
+          width: TW, background: 'rgba(30,41,59,0.93)', borderRadius: 6,
+          padding: '7px 12px', pointerEvents: 'none', zIndex: 9999,
+        }}>
+          <div style={{ fontSize: 10, color: '#94a3b8', textAlign: 'center', marginBottom: 4 }}>{getNoun(tooltip.equipe)}</div>
+          <div style={{ fontSize: 12, color: '#fff', fontWeight: 700, textAlign: 'center' }}>{tooltip.essence} — {tooltip.n} placettes</div>
+        </div>
+      )}
 
       {/* Legend */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 14px', marginTop: 8, justifyContent: 'center' }}>
         {allEss.map(e => (
-          <div key={e} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#475569' }}>
+          <div key={e} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#bac4d0' }}>
             <div style={{ width: 10, height: 10, borderRadius: 2, background: essColor[e], flexShrink: 0 }} />
             {e}
           </div>
@@ -560,19 +626,6 @@ function StrateParEquipeChart({ rows }: { rows: StrateParEquipe[] }) {
   );
 }
 
-function TabEssence({ data }: { data: DashboardData }) {
-  const { essences, stratesParEquipe } = data;
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <Card title="Essences collectées par équipe">
-        <StrateParEquipeChart rows={stratesParEquipe} />
-      </Card>
-      <Card title="Distribution des essences réalisées">
-        <EssenceDonutChart essences={essences} />
-      </Card>
-    </div>
-  );
-}
 
 function fmtDate(raw: string): string {
   const d = new Date(raw);
@@ -631,8 +684,8 @@ function DailyBarChart({ days }: { days: { date_visite: string; nb_placettes: nu
             return (
               <g key={i}>
                 <line x1={ML} x2={VW - MR} y1={y} y2={y}
-                  stroke={i === 0 ? '#94a3b8' : '#e2e8f0'} strokeWidth={i === 0 ? 1.5 : 1} />
-                <text x={ML - 6} y={y} textAnchor="end" dominantBaseline="middle" fontSize={10} fill="#64748b">{val}</text>
+                  stroke={i === 0 ? '#94a3b8' : 'rgba(255,255,255,0.08)'} strokeWidth={i === 0 ? 1.5 : 1} />
+                <text x={ML - 6} y={y} textAnchor="end" dominantBaseline="middle" fontSize={10} fill="#7a8a9c">{val}</text>
               </g>
             );
           })}
@@ -642,7 +695,7 @@ function DailyBarChart({ days }: { days: { date_visite: string; nb_placettes: nu
             const val = Math.round((yMaxR * i) / Y_TICKS);
             const y   = toYR(val);
             return (
-              <text key={i} x={VW - MR + 6} y={y} textAnchor="start" dominantBaseline="middle" fontSize={10} fill="#0284c7">{val}</text>
+              <text key={i} x={VW - MR + 6} y={y} textAnchor="start" dominantBaseline="middle" fontSize={10} fill="#0ea5e9">{val}</text>
             );
           })}
 
@@ -653,7 +706,7 @@ function DailyBarChart({ days }: { days: { date_visite: string; nb_placettes: nu
             const by = toYL(d.nb_placettes);
             return (
               <rect key={d.date_visite} x={bx} y={by} width={barW} height={bh}
-                fill="#10b981" rx={2} opacity={0.82}
+                fill="#34d399" rx={2} opacity={0.82}
                 style={{ cursor: 'pointer' }}
                 onMouseEnter={e => setTooltip({ cx: e.clientX, cy: e.clientY, label: fmtDate(d.date_visite), daily: d.nb_placettes, cumul: d.cumul_placettes })}
                 onMouseLeave={() => setTooltip(null)} />
@@ -661,10 +714,10 @@ function DailyBarChart({ days }: { days: { date_visite: string; nb_placettes: nu
           })}
 
           {/* Cumulative line */}
-          <polyline points={linePoints} fill="none" stroke="#0284c7" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+          <polyline points={linePoints} fill="none" stroke="#0ea5e9" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
           {days.map((d, i) => (
             <circle key={d.date_visite} cx={toX(i)} cy={toYR(d.cumul_placettes)} r={3}
-              fill="#0284c7" stroke="#fff" strokeWidth={1.5}
+              fill="#0ea5e9" stroke="#0d1b2a" strokeWidth={1.5}
               style={{ cursor: 'pointer' }}
               onMouseEnter={e => setTooltip({ cx: e.clientX, cy: e.clientY, label: fmtDate(d.date_visite), daily: d.nb_placettes, cumul: d.cumul_placettes })}
               onMouseLeave={() => setTooltip(null)} />
@@ -678,7 +731,7 @@ function DailyBarChart({ days }: { days: { date_visite: string; nb_placettes: nu
             return (
               <text key={d.date_visite}
                 x={lx} y={ly}
-                textAnchor="end" fontSize={10} fill="#64748b"
+                textAnchor="end" fontSize={10} fill="#7a8a9c"
                 transform={`rotate(-45, ${lx}, ${ly})`}>
                 {fmtDate(d.date_visite)}
               </text>
@@ -696,7 +749,7 @@ function DailyBarChart({ days }: { days: { date_visite: string; nb_placettes: nu
               <g key={`year-${i}`}>
                 <line x1={lx} x2={lx} y1={MT} y2={MT + cH}
                   stroke="#94a3b8" strokeWidth={1} strokeDasharray="4 3" />
-                <text x={lx + 4} y={MT + 10} fontSize={10} fill="#64748b" fontWeight="600">
+                <text x={lx + 4} y={MT + 10} fontSize={10} fill="#bac4d0" fontWeight="600">
                   {curYear}
                 </text>
               </g>
@@ -704,7 +757,7 @@ function DailyBarChart({ days }: { days: { date_visite: string; nb_placettes: nu
           })}
 
           {/* Year label at start (always shown) */}
-          <text x={ML + 4} y={MT + 10} fontSize={10} fill="#64748b" fontWeight="600">
+          <text x={ML + 4} y={MT + 10} fontSize={10} fill="#bac4d0" fontWeight="600">
             {getYear(days[0].date_visite)}
           </text>
 
@@ -714,12 +767,12 @@ function DailyBarChart({ days }: { days: { date_visite: string; nb_placettes: nu
       {/* Legend — centered below chart, outside scroll */}
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 20, marginTop: 8, marginBottom: 4 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <div style={{ width: 10, height: 10, background: '#10b981', borderRadius: 2 }} />
-          <span style={{ fontSize: 11, color: '#64748b' }}>Placettes / jour</span>
+          <div style={{ width: 10, height: 10, background: '#34d399', borderRadius: 2 }} />
+          <span style={{ fontSize: 11, color: '#7a8a9c' }}>Placettes / jour</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <svg width={8} height={8}><circle cx={4} cy={4} r={4} fill="#0284c7" /></svg>
-          <span style={{ fontSize: 11, color: '#0284c7' }}>Cumul</span>
+          <svg width={8} height={8}><circle cx={4} cy={4} r={4} fill="#0ea5e9" /></svg>
+          <span style={{ fontSize: 11, color: '#0ea5e9' }}>Cumul</span>
         </div>
       </div>
 
@@ -750,88 +803,306 @@ function DailyBarChart({ days }: { days: { date_visite: string; nb_placettes: nu
   );
 }
 
+// ─── Mini bar chart — one per team ───────────────────────────────────────────
+
+const MINI_BAR_STEP = 20;
+
+function MiniTeamBarChart({ days, color, fullWidth = false }: {
+  days: { date_visite: string; nb_visite: number }[];
+  color: string;
+  fullWidth?: boolean;
+}) {
+  const [tooltip, setTooltip] = useState<{ cx: number; cy: number; label: string; n: number; cumul: number } | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerW, setContainerW] = useState(0);
+
+  useEffect(() => {
+    if (!fullWidth) return;
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(entries => setContainerW(entries[0].contentRect.width));
+    ro.observe(el);
+    setContainerW(el.getBoundingClientRect().width);
+    return () => ro.disconnect();
+  }, [fullWidth]);
+
+  if (days.length === 0) return (
+    <p style={{ color: '#94a3b8', fontSize: 12, textAlign: 'center', padding: '24px 0' }}>Aucune donnée</p>
+  );
+
+  const ML = 32, MR = 36, MT = 12, MB = 36;
+  const VH = fullWidth ? 260 : 180;
+  const cH = VH - MT - MB;
+
+  // In fullWidth mode: derive step from measured container width so bars fill edge-to-edge
+  const STEP = fullWidth && containerW > 0
+    ? (containerW - ML - MR) / days.length
+    : MINI_BAR_STEP;
+  const cW = days.length * STEP;
+  const VW = fullWidth && containerW > 0 ? containerW : cW + ML + MR;
+  const barW = STEP * 0.6;
+
+  const maxVal = Math.max(...days.map(d => d.nb_visite), 1);
+  const yMax   = Math.ceil(maxVal / 3) * 3 || 3;
+  const Y_TICKS = 3;
+
+  let cumul = 0;
+  const cumulArr = days.map(d => { cumul += d.nb_visite; return cumul; });
+  const maxCumul = cumulArr[cumulArr.length - 1] || 1;
+
+  const labelStep = days.length > 30 ? 7 : days.length > 14 ? 3 : 1;
+
+  const toX  = (i: number) => ML + (i + 0.5) * STEP;
+  const toYL = (v: number) => MT + cH - (v / yMax) * cH;
+  const toYR = (v: number) => MT + cH - (v / maxCumul) * cH;
+
+  const linePoints = cumulArr.map((c, i) => `${toX(i)},${toYR(c)}`).join(' ');
+  const TW = 130, TH = 44;
+
+  const svgEl = (
+    <svg
+      width={fullWidth ? '100%' : VW}
+      height={VH}
+      viewBox={`0 0 ${VW} ${VH}`}
+      style={{ display: 'block', overflow: 'visible', ...(fullWidth ? { width: '100%' } : { minWidth: VW }) }}
+    >
+      {/* Grid + Y axis */}
+      {Array.from({ length: Y_TICKS + 1 }, (_, i) => {
+        const val = Math.round((yMax * i) / Y_TICKS);
+        const y   = toYL(val);
+        return (
+          <g key={i}>
+            <line x1={ML} x2={VW - MR} y1={y} y2={y}
+              stroke={i === 0 ? '#94a3b8' : 'rgba(255,255,255,0.06)'} strokeWidth={i === 0 ? 1 : 1} />
+            <text x={ML - 4} y={y} textAnchor="end" dominantBaseline="middle" fontSize={9} fill="#7a8a9c">{val}</text>
+          </g>
+        );
+      })}
+
+      {/* Right Y axis (cumulative) */}
+      {Array.from({ length: Y_TICKS + 1 }, (_, i) => {
+        const val = Math.round((maxCumul * i) / Y_TICKS);
+        const y = toYR(val);
+        return (
+          <text key={i} x={VW - MR + 4} y={y} textAnchor="start" dominantBaseline="middle" fontSize={9} fill="#0ea5e9">{val}</text>
+        );
+      })}
+
+      {/* Bars */}
+      {days.map((d, i) => {
+        const bh = Math.max((d.nb_visite / yMax) * cH, 2);
+        const bx = toX(i) - barW / 2;
+        const by = toYL(d.nb_visite);
+        return (
+          <g key={d.date_visite}>
+            <rect x={bx} y={by} width={barW} height={bh} fill={color} rx={2} opacity={0.8} />
+            {/* Transparent full-column hit area */}
+            <rect x={toX(i) - MINI_BAR_STEP / 2} y={MT} width={MINI_BAR_STEP} height={cH}
+              fill="transparent" style={{ cursor: 'pointer' }}
+              onMouseEnter={e => setTooltip({ cx: e.clientX, cy: e.clientY, label: fmtDate(d.date_visite), n: d.nb_visite, cumul: cumulArr[i] })}
+              onMouseLeave={() => setTooltip(null)} />
+          </g>
+        );
+      })}
+
+      {/* Cumulative line */}
+      <polyline points={linePoints} fill="none" stroke="#0ea5e9" strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" />
+      {cumulArr.map((c, i) => (
+        <circle key={i} cx={toX(i)} cy={toYR(c)} r={2.5}
+          fill="#0ea5e9" stroke="#0d1b2a" strokeWidth={1} />
+      ))}
+
+      {/* X labels */}
+      {days.map((d, i) => {
+        if (i % labelStep !== 0) return null;
+        const lx = toX(i);
+        const ly = MT + cH + 10;
+        return (
+          <text key={d.date_visite} x={lx} y={ly}
+            textAnchor="end" fontSize={9} fill="#7a8a9c"
+            transform={`rotate(-45, ${lx}, ${ly})`}>
+            {fmtDate(d.date_visite)}
+          </text>
+        );
+      })}
+    </svg>
+  );
+
+  return (
+    <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
+      {fullWidth
+        ? <div style={{ paddingBottom: 2 }}>{svgEl}</div>
+        : <div style={{ overflowX: 'auto', overflowY: 'visible', height: VH, paddingBottom: 2 }}>{svgEl}</div>
+      }
+      {tooltip && createPortal(
+        <div style={{
+          position: 'fixed', left: tooltip.cx - TW / 2, top: tooltip.cy - TH - 10,
+          width: TW, background: 'rgba(30,41,59,0.93)', borderRadius: 6,
+          padding: '7px 12px', pointerEvents: 'none', zIndex: 99999,
+        }}>
+          <div style={{ fontSize: 10, color: '#94a3b8', textAlign: 'center', marginBottom: 4 }}>{tooltip.label}</div>
+          <div style={{ fontSize: 12, color: '#fff', fontWeight: 700, textAlign: 'center' }}>
+            {tooltip.n} placette{tooltip.n > 1 ? 's' : ''} — cumul {tooltip.cumul}
+          </div>
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+}
+
 function TabTemporel({ data }: { data: DashboardData }) {
   const { temporel, kpi } = data;
-  const { visitesParJour } = temporel;
-  const productivite = sortByNum(temporel.productivite);
+  const { visitesParJour, moyParJourEquipe } = temporel;
   const moy = Number(kpi.moy_par_jour);
-  const moyGlobale = productivite.length > 0
-    ? (productivite.reduce((s: number, eq: ProductiviteEquipe) => s + Number(eq.moy_par_jour || 0), 0) / productivite.length)
-    : 0;
   const remaining = kpi.restantes ?? kpi.total_programme - kpi.total_visitees;
   const jrsRestants = moy > 0 ? Math.ceil(remaining / moy) : '—';
+  const [modalOpen, setModalOpen] = useState(false);
+
+  // Group per-team daily data
+  const byTeam = moyParJourEquipe.reduce((acc: Record<string, { date_visite: string; nb_visite: number }[]>, row: MoyJourEquipe) => {
+    if (!acc[row.equipe]) acc[row.equipe] = [];
+    acc[row.equipe].push({ date_visite: row.date_visite, nb_visite: row.nb_visite });
+    return acc;
+  }, {});
+  const teamEntries = sortByNum(Object.keys(byTeam).map(eq => ({ equipe: eq }))).map(e => e.equipe);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-      {/* Bar + line chart — projection badge in top-right corner */}
+      {/* Global bar + line chart */}
       <Card title="Placettes réalisées par jour · cumul">
         <div style={{ position: 'relative' }}>
           {jrsRestants != null && (
             <div style={{
               position: 'absolute', top: -32, right: 0, zIndex: 1,
               display: 'flex', alignItems: 'center', gap: 6,
-              background: '#fffbeb', border: '1px solid #fde68a',
+              background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.3)',
               borderRadius: 8, padding: '3px 10px',
             }}>
-              <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 15, color: '#f59e0b' }}>{jrsRestants}</span>
-              <span style={{ fontSize: 10, color: '#92400e' }}>jours restants estimés</span>
+              <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 15, color: '#fbbf24' }}>{jrsRestants}</span>
+              <span style={{ fontSize: 10, color: '#fcd34d' }}>jours restants estimés</span>
             </div>
           )}
           <DailyBarChart days={visitesParJour} />
         </div>
       </Card>
 
-      {/* Per-team productivity */}
-      <Card title="Moyenne des placettes réalisées par équipe">
-        <div style={{ position: 'relative' }}>
+      {/* Per-team 2×3 grid */}
+      <Card title="Progression des placettes réalisées par équipe" action={
+        <button onClick={() => setModalOpen(true)} title="Agrandir" style={{
+          background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+          borderRadius: 6, padding: '3px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
+          color: '#bac4d0', fontSize: 11,
+        }}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/>
+            <line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>
+          </svg>
+          Agrandir
+        </button>
+      }>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
+        {teamEntries.map(eq => {
+          const color = equipeColor(eq);
+          const days  = byTeam[eq] ?? [];
+          const total = days.reduce((s, d) => s + d.nb_visite, 0);
+          return (
+            <div key={eq} style={{ ...S.card, padding: 16, position: 'relative', overflow: 'hidden' }}>
+              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: color }} />
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: color, flexShrink: 0 }} />
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#edf1f5' }}>{equipeShort(eq)}</span>
+                </div>
+                <span style={{ fontSize: 11, color: '#94a3b8', fontFamily: 'monospace' }}>
+                  {total} réalisée{total > 1 ? 's' : ''}
+                </span>
+              </div>
+              <MiniTeamBarChart days={days} color={color} />
+            </div>
+          );
+        })}
+      </div>
+      </Card>
+
+      {/* ── Expanded modal ───────────────────────────────────────────────── */}
+      {modalOpen && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 9000,
+          background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '32px 24px',
+        }} onClick={() => setModalOpen(false)}>
           <div style={{
-            position: 'absolute', top: -38, right: 0, zIndex: 1,
-            display: 'flex', alignItems: 'center', gap: 6,
-            background: '#eff6ff', border: '1px solid #bfdbfe',
-            borderRadius: 8, padding: '3px 10px',
-          }}>
-            <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 15, color: '#2563eb' }}>{moyGlobale.toFixed(1)}</span>
-            <span style={{ fontSize: 10, color: '#1e40af' }}>moyenne globale / jour</span>
+            background: '#0f1a2e', border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: 16, width: '100%', maxWidth: 900,
+            boxShadow: '0 24px 64px rgba(0,0,0,0.6)',
+            display: 'flex', flexDirection: 'column',
+            height: 'calc(100vh - 64px)',
+          }} onClick={e => e.stopPropagation()}>
+
+            {/* Modal header — sticky */}
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '20px 28px', borderBottom: '1px solid rgba(255,255,255,0.07)', flexShrink: 0,
+            }}>
+              <h2 style={{ fontSize: 16, fontWeight: 700, color: '#edf1f5', margin: 0 }}>
+                Progression des placettes réalisées par équipe
+              </h2>
+              <button onClick={() => setModalOpen(false)} style={{
+                background: 'none', border: '1px solid rgba(255,255,255,0.15)',
+                borderRadius: 8, padding: '4px 10px', cursor: 'pointer', color: '#94a3b8', fontSize: 13,
+              }}>✕</button>
+            </div>
+
+            {/* Scrollable charts */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px 28px', display: 'flex', flexDirection: 'column', gap: 24 }}>
+              {teamEntries.map(eq => {
+                const color = equipeColor(eq);
+                const days  = byTeam[eq] ?? [];
+                const total = days.reduce((s, d) => s + d.nb_visite, 0);
+                return (
+                  <div key={eq} style={{
+                    background: '#162035', borderRadius: 12,
+                    border: '1px solid rgba(255,255,255,0.07)',
+                    position: 'relative', overflow: 'hidden', flexShrink: 0,
+                  }}>
+                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: color }} />
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px 10px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ width: 10, height: 10, borderRadius: '50%', background: color }} />
+                        <span style={{ fontSize: 14, fontWeight: 600, color: '#edf1f5' }}>{equipeShort(eq)}</span>
+                      </div>
+                      <span style={{ fontSize: 12, color: '#94a3b8', fontFamily: 'monospace' }}>
+                        {total} réalisée{total > 1 ? 's' : ''}
+                      </span>
+                    </div>
+                    <MiniTeamBarChart days={days} color={color} fullWidth />
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 10 }}>
-          {productivite.map((eq: ProductiviteEquipe) => {
-            const color = equipeColor(eq.equipe);
-            return (
-              <div key={eq.equipe} style={{ ...S.innerCard, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: color, flexShrink: 0 }} />
-                  <p style={{ fontSize: 13, fontWeight: 600 }}>{equipeShort(eq.equipe)}</p>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-                  <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 24, color }}>{Number(eq.moy_par_jour).toFixed(1)}</span>
-                  <span style={{ color: '#64748b', fontSize: 12 }}>/ jour</span>
-                </div>
-                <p style={{ fontSize: 11, color: '#94a3b8' }}>
-                  {eq.total_visite} réalisées · {eq.nb_jours} jours travaillés
-                </p>
-              </div>
-            );
-          })}
-        </div>
-      </Card>
+      )}
+
     </div>
   );
 }
 
 // Series definition for accessibility (used in both chart and header)
 const ACC_SERIES = [
-  { key: 'nb_a_pied_0'  as const, label: '< 100 m',       color: '#10b981', bg: '#f0fdf4' },
-  { key: 'nb_a_pied_1'  as const, label: '100 – 500 m',   color: '#d97706', bg: '#fffbeb' },
-  { key: 'nb_a_pied_2'  as const, label: '> 500 m',       color: '#ea580c', bg: '#fff7ed' },
+  { key: 'nb_a_pied_0'  as const, label: '< 100 m',       color: '#34d399', bg: '#f0fdf4' },
+  { key: 'nb_a_pied_1'  as const, label: '100 – 500 m',   color: '#f59e0b', bg: '#fffbeb' },
+  { key: 'nb_a_pied_2'  as const, label: '> 500 m',       color: '#f97316', bg: '#fff7ed' },
 ] as const;
 
 // ─── Grouped SVG bar chart ────────────────────────────────────────────────────
 
 function GroupedBarChart({ equipes }: { equipes: AccessibiliteEquipe[] }) {
   const [tooltip, setTooltip] = useState<{
-    x: number; y: number; label: string; equipe: string; value: number; color: string;
+    cx: number; cy: number; label: string; equipe: string; value: number; color: string;
   } | null>(null);
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
 
@@ -866,6 +1137,7 @@ function GroupedBarChart({ equipes }: { equipes: AccessibiliteEquipe[] }) {
   const TW = 138, TH = 40;
 
   return (
+    <div style={{ position: 'relative' }}>
     <svg viewBox={`0 0 ${VW} ${VH}`} width="100%"
       style={{ display: 'block', overflow: 'visible' }}>
 
@@ -876,10 +1148,10 @@ function GroupedBarChart({ equipes }: { equipes: AccessibiliteEquipe[] }) {
         return (
           <g key={i}>
             <line x1={ML} x2={VW - MR} y1={y} y2={y}
-              stroke={i === 0 ? '#94a3b8' : '#e2e8f0'}
+              stroke={i === 0 ? '#94a3b8' : 'rgba(255,255,255,0.08)'}
               strokeWidth={i === 0 ? 1.5 : 1} />
             <text x={ML - 6} y={y} textAnchor="end" dominantBaseline="middle"
-              fontSize={10} fill="#64748b">{val}</text>
+              fontSize={10} fill="#7a8a9c">{val}</text>
           </g>
         );
       })}
@@ -902,11 +1174,10 @@ function GroupedBarChart({ equipes }: { equipes: AccessibiliteEquipe[] }) {
                   fill={s.color} rx={3}
                   opacity={hoveredKey === bKey ? 1 : 0.82}
                   style={{ cursor: 'pointer', transition: 'opacity 0.12s' }}
-                  onMouseEnter={() => {
-                    const cx = bx + (barW - 2) / 2;
+                  onMouseEnter={ev => {
                     setTooltip({
-                      x: Math.min(Math.max(cx - TW / 2, ML), VW - MR - TW),
-                      y: by - TH - 10,
+                      cx: ev.clientX,
+                      cy: ev.clientY,
                       label: s.label,
                       equipe: equipeShort(eq.equipe),
                       value: eq[s.key] ?? 0,
@@ -919,7 +1190,7 @@ function GroupedBarChart({ equipes }: { equipes: AccessibiliteEquipe[] }) {
               );
             })}
             <text x={labelX} y={MT + cH + 14}
-              textAnchor="middle" fontSize={10} fill="#475569">
+              textAnchor="middle" fontSize={10} fill="#bac4d0">
               {equipeShort(eq.equipe)}
             </text>
           </g>
@@ -933,54 +1204,31 @@ function GroupedBarChart({ equipes }: { equipes: AccessibiliteEquipe[] }) {
         return ACC_SERIES.map((s, i) => (
           <g key={s.key} transform={`translate(${startX + i * ITEM_W}, ${legendY})`}>
             <rect width={10} height={10} fill={s.color} rx={2} />
-            <text x={14} y={9} fontSize={11} fill="#475569">{s.label}</text>
+            <text x={14} y={9} fontSize={11} fill="#bac4d0">{s.label}</text>
           </g>
         ));
       })()}
 
-      {/* Hover tooltip — rendered last so it floats on top */}
-      {tooltip && (
-        <g style={{ pointerEvents: 'none' }}>
-          <rect x={tooltip.x} y={tooltip.y} width={TW} height={TH}
-            fill="#ffffff" rx={6} opacity={1}
-            stroke="#e2e8f0" strokeWidth={1} />
-          {/* triangle pointer */}
-          <polygon
-            points={`
-              ${tooltip.x + TW / 2 - 6},${tooltip.y + TH}
-              ${tooltip.x + TW / 2 + 6},${tooltip.y + TH}
-              ${tooltip.x + TW / 2},${tooltip.y + TH + 7}
-            `}
-            fill="#ffffff"
-          />
-          <line
-            x1={tooltip.x + TW / 2 - 6} y1={tooltip.y + TH}
-            x2={tooltip.x + TW / 2}     y2={tooltip.y + TH + 7}
-            stroke="#e2e8f0" strokeWidth={1}
-          />
-          <line
-            x1={tooltip.x + TW / 2 + 6} y1={tooltip.y + TH}
-            x2={tooltip.x + TW / 2}     y2={tooltip.y + TH + 7}
-            stroke="#e2e8f0" strokeWidth={1}
-          />
-          <text x={tooltip.x + TW / 2} y={tooltip.y + 13}
-            textAnchor="middle" fontSize={10} fill="#94a3b8">
-            {tooltip.equipe}
-          </text>
-          <text x={tooltip.x + TW / 2} y={tooltip.y + 29}
-            textAnchor="middle" fontSize={12} fontWeight="bold" fill={tooltip.color}>
-            {tooltip.label} : {tooltip.value}
-          </text>
-        </g>
-      )}
     </svg>
+
+    {tooltip && (
+      <div style={{
+        position: 'fixed', left: tooltip.cx - TW / 2, top: tooltip.cy - TH - 10,
+        width: TW, background: 'rgba(30,41,59,0.93)', borderRadius: 6,
+        padding: '7px 12px', pointerEvents: 'none', zIndex: 9999,
+      }}>
+        <div style={{ fontSize: 10, color: '#94a3b8', textAlign: 'center', marginBottom: 4 }}>{tooltip.equipe}</div>
+        <div style={{ fontSize: 12, fontWeight: 700, textAlign: 'center', color: tooltip.color }}>{tooltip.label} : {tooltip.value}</div>
+      </div>
+    )}
+    </div>
   );
 }
 
 // ─── Accessible / Inaccessible stacked bar chart per équipe ──────────────────
 
 function AccessParEquipeChart({ equipes }: { equipes: AccessibiliteEquipe[] }) {
-  const [tooltip, setTooltip] = useState<{ x: number; y: number; equipe: string; acc: number; inacc: number } | null>(null);
+  const [tooltip, setTooltip] = useState<{ cx: number; cy: number; equipe: string; acc: number; inacc: number } | null>(null);
 
   const active = equipes.filter(e => e.total_visite > 0);
   if (active.length === 0) return <p style={{ color: '#94a3b8', fontSize: 14, textAlign: 'center', padding: '32px 0' }}>Aucune donnée</p>;
@@ -1013,8 +1261,8 @@ function AccessParEquipeChart({ equipes }: { equipes: AccessibiliteEquipe[] }) {
           const y = toY(val);
           return (
             <g key={i}>
-              <line x1={ML} x2={VW - MR} y1={y} y2={y} stroke={i === 0 ? '#94a3b8' : '#e2e8f0'} strokeWidth={i === 0 ? 1.5 : 1} />
-              <text x={ML - 5} y={y} textAnchor="end" dominantBaseline="middle" fontSize={10} fill="#64748b">{val}</text>
+              <line x1={ML} x2={VW - MR} y1={y} y2={y} stroke={i === 0 ? '#94a3b8' : 'rgba(255,255,255,0.08)'} strokeWidth={i === 0 ? 1.5 : 1} />
+              <text x={ML - 5} y={y} textAnchor="end" dominantBaseline="middle" fontSize={10} fill="#7a8a9c">{val}</text>
             </g>
           );
         })}
@@ -1027,35 +1275,42 @@ function AccessParEquipeChart({ equipes }: { equipes: AccessibiliteEquipe[] }) {
           const inaccH = (eq.nb_inaccessible / yMax) * cH;
           return (
             <g key={eq.equipe} style={{ cursor: 'pointer' }}
-              onMouseEnter={() => setTooltip({ x: Math.min(bx + BAR_W / 2 - TW / 2, VW - MR - TW), y: toY(eq.total_visite) - TH - 8, equipe: eq.equipe, acc: eq.nb_accessible, inacc: eq.nb_inaccessible })}
+              onMouseEnter={ev => setTooltip({ cx: ev.clientX, cy: ev.clientY, equipe: eq.equipe, acc: eq.nb_accessible, inacc: eq.nb_inaccessible })}
               onMouseLeave={() => setTooltip(null)}>
-              <rect x={bx} y={baseY - accH} width={BAR_W} height={accH} fill="#059669" opacity={0.85} />
-              <rect x={bx} y={baseY - accH - inaccH} width={BAR_W} height={inaccH} fill="#ef4444" opacity={0.85} />
-              <text x={bx + BAR_W / 2} y={toY(eq.total_visite) - 5} textAnchor="middle" fontSize={10} fill="#475569" fontWeight="700">{eq.total_visite}</text>
-              <text x={bx + BAR_W / 2} y={MT + cH + 14} textAnchor="middle" fontSize={10} fill="#64748b" fontWeight="600">{getNum(eq.equipe)}</text>
-              <text x={bx + BAR_W / 2} y={MT + cH + 28} textAnchor="middle" fontSize={8.5} fill="#334155">{getNoun(eq.equipe)}</text>
+              <rect x={bx} y={baseY - accH} width={BAR_W} height={accH} fill="#10b981" opacity={0.85} />
+              <rect x={bx} y={baseY - accH - inaccH} width={BAR_W} height={inaccH} fill="#f87171" opacity={0.85} />
+              <text x={bx + BAR_W / 2} y={toY(eq.total_visite) - 5} textAnchor="middle" fontSize={10} fill="#bac4d0" fontWeight="700">{eq.total_visite}</text>
+              <text x={bx + BAR_W / 2} y={MT + cH + 14} textAnchor="middle" fontSize={10} fill="#bac4d0" fontWeight="600">{getNum(eq.equipe)}</text>
+              <text x={bx + BAR_W / 2} y={MT + cH + 28} textAnchor="middle" fontSize={8.5} fill="#dde4ec">{getNoun(eq.equipe)}</text>
             </g>
           );
         })}
 
-        {/* Tooltip */}
-        {tooltip && (
-          <g style={{ pointerEvents: 'none' }}>
-            <rect x={tooltip.x} y={tooltip.y} width={TW} height={TH} rx={6} fill="#1e293b" opacity={0.93} />
-            <text x={tooltip.x + TW / 2} y={tooltip.y + 14} textAnchor="middle" fontSize={10} fill="#94a3b8">{getNoun(tooltip.equipe)}</text>
-            <text x={tooltip.x + 14} y={tooltip.y + 32} fontSize={11} fill="#4ade80">● Accessibles : {tooltip.acc}</text>
-            <text x={tooltip.x + 14} y={tooltip.y + 47} fontSize={11} fill="#f87171">● Inaccessibles : {tooltip.inacc}</text>
-          </g>
-        )}
       </svg>
+
+      {tooltip && (
+        <div style={{
+          position: 'fixed', left: tooltip.cx - TW / 2, top: tooltip.cy - TH - 10,
+          width: TW, background: 'rgba(30,41,59,0.93)', borderRadius: 6,
+          padding: '7px 12px', pointerEvents: 'none', zIndex: 9999,
+        }}>
+          <div style={{ fontSize: 10, color: '#94a3b8', textAlign: 'center', marginBottom: 4 }}>{getNoun(tooltip.equipe)}</div>
+          <div style={{ fontSize: 12, textAlign: 'center' }}>
+            <span style={{ color: '#86efac', fontWeight: 700 }}>● {tooltip.acc}</span>
+            <span style={{ color: '#94a3b8', margin: '0 6px' }}>·</span>
+            <span style={{ color: '#f87171', fontWeight: 700 }}>● {tooltip.inacc}</span>
+          </div>
+          <div style={{ fontSize: 9, color: '#94a3b8', textAlign: 'center', marginTop: 3 }}>accessibles · inaccessibles</div>
+        </div>
+      )}
 
       {/* Legend */}
       <div style={{ display: 'flex', gap: 20, marginTop: 8, justifyContent: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#475569' }}>
-          <div style={{ width: 12, height: 12, borderRadius: 2, background: '#059669' }} /> Accessible
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#bac4d0' }}>
+          <div style={{ width: 12, height: 12, borderRadius: 2, background: '#10b981' }} /> Accessible
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#475569' }}>
-          <div style={{ width: 12, height: 12, borderRadius: 2, background: '#ef4444' }} /> Inaccessible
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#bac4d0' }}>
+          <div style={{ width: 12, height: 12, borderRadius: 2, background: '#f87171' }} /> Inaccessible
         </div>
       </div>
     </div>
@@ -1072,21 +1327,21 @@ function TabAccessibilite({ data }: { data: DashboardData }) {
   const nbInacc = g.nb_inaccessible ?? 0;
 
   const row1 = [
-    { label: 'Placettes réalisées', value: g.total_visitees, pct: null,                                        color: '#475569', bg: '#f1f5f9' },
-    { label: 'Placettes accessibles',     value: g.nb_accessible,  pct: +(g.nb_accessible / total * 100).toFixed(1), color: '#059669', bg: '#f0fdf4' },
-    { label: 'Placettes inaccessibles',   value: nbInacc,          pct: +(nbInacc         / total * 100).toFixed(1), color: '#e11d48', bg: '#fff1f2' },
+    { label: 'Placettes réalisées', value: g.total_visitees, pct: null,                                        color: '#94a3b8', bg: 'rgba(71,85,105,0.2)' },
+    { label: 'Placettes accessibles',     value: g.nb_accessible,  pct: +(g.nb_accessible / total * 100).toFixed(1), color: '#6ee7b7', bg: 'rgba(5,150,105,0.15)' },
+    { label: 'Placettes inaccessibles',   value: nbInacc,          pct: +(nbInacc         / total * 100).toFixed(1), color: '#f87171', bg: 'rgba(225,29,72,0.15)' },
   ];
 
   const row2 = [
-    { label: '< 100 m à pied',    value: g.nb_a_pied_0, pct: +(g.nb_a_pied_0 / total * 100).toFixed(1), color: '#10b981', bg: '#f0fdf4' },
-    { label: '100 – 500 m',       value: g.nb_a_pied_1, pct: +(g.nb_a_pied_1 / total * 100).toFixed(1), color: '#d97706', bg: '#fffbeb' },
-    { label: '> 500 m',           value: g.nb_a_pied_2, pct: +(g.nb_a_pied_2 / total * 100).toFixed(1), color: '#ea580c', bg: '#fff7ed' },
+    { label: '< 100 m à pied',    value: g.nb_a_pied_0, pct: +(g.nb_a_pied_0 / total * 100).toFixed(1), color: '#6ee7b7', bg: 'rgba(5,150,105,0.15)' },
+    { label: '100 – 500 m',       value: g.nb_a_pied_1, pct: +(g.nb_a_pied_1 / total * 100).toFixed(1), color: '#fcd34d', bg: 'rgba(245,158,11,0.15)' },
+    { label: '> 500 m',           value: g.nb_a_pied_2, pct: +(g.nb_a_pied_2 / total * 100).toFixed(1), color: '#fdba74', bg: 'rgba(234,88,12,0.15)' },
   ];
 
   function StatCard({ s }: { s: { label: string; value: number; pct: number | null; color: string; bg: string } }) {
     return (
       <div style={{ ...S.card, background: s.bg, padding: '10px 6px 2px', textAlign: 'center', borderLeft: `4px solid ${s.color}` }}>
-        <div style={{ fontSize: 10, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
+        <div style={{ fontSize: 10, color: '#bac4d0', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
           {s.label}
         </div>
         <div style={{ fontSize: 22, fontWeight: 700, color: s.color, lineHeight: 1 }}>{s.value}</div>
@@ -1126,6 +1381,7 @@ function TabAccessibilite({ data }: { data: DashboardData }) {
 
 // ─── Contrôle Qualité tab ─────────────────────────────────────────────────────
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function ControlePieChart({ slices }: { slices: { label: string; value: number; color: string }[] }) {
   const [hovered, setHovered] = useState<number | null>(null);
   const total = slices.reduce((s, sl) => s + sl.value, 0) || 1;
@@ -1162,7 +1418,7 @@ function ControlePieChart({ slices }: { slices: { label: string; value: number; 
       <div style={{ position: 'relative', width: SIZE, height: SIZE }}>
         <svg width={SIZE} height={SIZE}>
           {paths.map((p, i) => (
-            <path key={i} d={p.d} fill={p.color} stroke="#fff" strokeWidth={2}
+            <path key={i} d={p.d} fill={p.color} stroke="#0d1b2a" strokeWidth={2}
               style={{ cursor: 'pointer', transform: `translate(${p.dx}px,${p.dy}px)`, transition: 'transform 0.18s', opacity: hovered !== null && hovered !== i ? 0.5 : 1 }}
               onMouseEnter={() => setHovered(i)} onMouseLeave={() => setHovered(null)} />
           ))}
@@ -1175,7 +1431,7 @@ function ControlePieChart({ slices }: { slices: { label: string; value: number; 
             </>
           ) : (
             <>
-              <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 22, color: '#1e293b' }}>{total}</span>
+              <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 22, color: '#edf1f5' }}>{total}</span>
               <span style={{ fontSize: 10, color: '#94a3b8', marginTop: 1 }}>total</span>
             </>
           )}
@@ -1183,10 +1439,10 @@ function ControlePieChart({ slices }: { slices: { label: string; value: number; 
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
         {paths.map((p, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 8, background: hovered === i ? `${p.color}12` : '#f8fafc', cursor: 'pointer', transition: 'background 0.15s' }}
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 8, background: hovered === i ? `${p.color}22` : '#1a2540', cursor: 'pointer', transition: 'background 0.15s' }}
             onMouseEnter={() => setHovered(i)} onMouseLeave={() => setHovered(null)}>
             <span style={{ width: 10, height: 10, borderRadius: '50%', background: p.color, flexShrink: 0, display: 'inline-block' }} />
-            <span style={{ flex: 1, fontSize: 13, color: '#334155' }}>{p.label}</span>
+            <span style={{ flex: 1, fontSize: 13, color: '#dde4ec' }}>{p.label}</span>
             <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 15, color: p.color }}>{p.value}</span>
             <span style={{ fontSize: 11, color: '#94a3b8', minWidth: 40, textAlign: 'right' }}>{p.pct.toFixed(1)}%</span>
           </div>
@@ -1198,7 +1454,7 @@ function ControlePieChart({ slices }: { slices: { label: string; value: number; 
 
 function TabControleQualite({ data }: { data: DashboardData }) {
   const { kpi, controleParEquipe, controleServiceParEquipe, equipes } = data;
-  const [tooltip, setTooltip] = useState<{ x: number; y: number; label: string; n: number } | null>(null);
+  const [tooltip, setTooltip] = useState<{ cx: number; cy: number; label: string; n: number } | null>(null);
 
   const controleC  = kpi.nb_controle ?? 0;
   const controleCS = kpi.nb_controle_service ?? 0;
@@ -1244,8 +1500,8 @@ function TabControleQualite({ data }: { data: DashboardData }) {
   const TW = 190, TH = 44;
 
   const SEGS = [
-    { key: 'nonCtrl' as const, color: '#10b981', label: 'Réalisées non contrôlées' },
-    { key: 'ctrl'    as const, color: '#8b5cf6', label: 'Contrôlées' },
+    { key: 'nonCtrl' as const, color: '#34d399', label: 'Réalisées non contrôlées' },
+    { key: 'ctrl'    as const, color: '#d946ef', label: 'Contrôlées' },
   ];
 
   return (
@@ -1254,12 +1510,12 @@ function TabControleQualite({ data }: { data: DashboardData }) {
       {/* ── KPI header ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
         {[
-          { label: 'Placettes contrôlées',      value: controle,                 pct: +((controle / (realise || 1)) * 100).toFixed(1), color: '#8b5cf6', bg: 'rgba(139,92,246,0.07)' },
-          { label: 'Placettes non contrôlées',   value: realise - controle,       pct: +(((realise - controle) / (realise || 1)) * 100).toFixed(1), color: '#10b981', bg: 'rgba(16,185,129,0.07)' },
-          { label: 'Taux de contrôle',           value: `${pctCtrl.toFixed(1)}%`, pct: null,                                                       color: '#0284c7', bg: 'rgba(2,132,199,0.07)' },
+          { label: 'Placettes contrôlées',      value: controle,                 pct: +((controle / (realise || 1)) * 100).toFixed(1), color: '#d946ef', bg: 'rgba(217,70,239,0.07)' },
+          { label: 'Placettes non contrôlées',   value: realise - controle,       pct: +(((realise - controle) / (realise || 1)) * 100).toFixed(1), color: '#34d399', bg: 'rgba(16,185,129,0.07)' },
+          { label: 'Taux de contrôle',           value: `${pctCtrl.toFixed(1)}%`, pct: null,                                                       color: '#0ea5e9', bg: 'rgba(2,132,199,0.07)' },
         ].map(s => (
           <div key={s.label} style={{ ...S.card, background: s.bg, padding: '10px 6px 2px', textAlign: 'center', borderLeft: `4px solid ${s.color}` }}>
-            <div style={{ fontSize: 10, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>{s.label}</div>
+            <div style={{ fontSize: 10, color: '#bac4d0', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>{s.label}</div>
             <div style={{ fontSize: 22, fontWeight: 700, color: s.color, lineHeight: 1 }}>{s.value}</div>
             {s.pct !== null && <div style={{ fontSize: 11, color: s.color, opacity: 0.75, marginTop: 3 }}>{s.pct} %</div>}
           </div>
@@ -1278,8 +1534,8 @@ function TabControleQualite({ data }: { data: DashboardData }) {
               return (
                 <g key={i}>
                   <line x1={ML} x2={VW - MR} y1={y} y2={y}
-                    stroke={i === 0 ? '#94a3b8' : '#e2e8f0'} strokeWidth={i === 0 ? 1.5 : 1} />
-                  <text x={ML - 5} y={y} textAnchor="end" dominantBaseline="middle" fontSize={10} fill="#64748b">{val}</text>
+                    stroke={i === 0 ? '#94a3b8' : 'rgba(255,255,255,0.08)'} strokeWidth={i === 0 ? 1.5 : 1} />
+                  <text x={ML - 5} y={y} textAnchor="end" dominantBaseline="middle" fontSize={10} fill="#7a8a9c">{val}</text>
                 </g>
               );
             })}
@@ -1299,34 +1555,37 @@ function TabControleQualite({ data }: { data: DashboardData }) {
                     return (
                       <rect key={seg.key} x={bx} y={segY} width={BAR_W} height={bh}
                         fill={seg.color} rx={0} opacity={0.88} style={{ cursor: 'pointer' }}
-                        onMouseEnter={() => setTooltip({ x: bx + BAR_W / 2 - TW / 2, y: segY - TH - 6, label: `${getNoun(r.equipe)} — ${seg.label}`, n })}
+                        onMouseEnter={ev => setTooltip({ cx: ev.clientX, cy: ev.clientY, label: `${getNoun(r.equipe)} — ${seg.label}`, n })}
                         onMouseLeave={() => setTooltip(null)} />
                     );
                   })}
                   {/* Total */}
-                  <text x={bx + BAR_W / 2} y={toY(r.total) - 5} textAnchor="middle" fontSize={10} fill="#475569" fontWeight="700">{r.total}</text>
+                  <text x={bx + BAR_W / 2} y={toY(r.total) - 5} textAnchor="middle" fontSize={10} fill="#bac4d0" fontWeight="700">{r.total}</text>
                   {/* Equipe N° */}
-                  <text x={bx + BAR_W / 2} y={MT + cH + 14} textAnchor="middle" fontSize={10} fill="#64748b" fontWeight="600">{getNum(r.equipe)}</text>
+                  <text x={bx + BAR_W / 2} y={MT + cH + 14} textAnchor="middle" fontSize={10} fill="#bac4d0" fontWeight="600">{getNum(r.equipe)}</text>
                   {/* Equipe noun */}
-                  <text x={bx + BAR_W / 2} y={MT + cH + 28} textAnchor="middle" fontSize={8.5} fill="#334155">{getNoun(r.equipe)}</text>
+                  <text x={bx + BAR_W / 2} y={MT + cH + 28} textAnchor="middle" fontSize={8.5} fill="#dde4ec">{getNoun(r.equipe)}</text>
                 </g>
               );
             })}
 
-            {/* Tooltip */}
-            {tooltip && (
-              <g style={{ pointerEvents: 'none' }}>
-                <rect x={tooltip.x} y={tooltip.y} width={TW} height={TH} rx={6} fill="#1e293b" opacity={0.93} />
-                <text x={tooltip.x + TW / 2} y={tooltip.y + 14} textAnchor="middle" fontSize={10} fill="#94a3b8">{tooltip.label}</text>
-                <text x={tooltip.x + TW / 2} y={tooltip.y + 32} textAnchor="middle" fontSize={12} fill="#fff" fontWeight="700">{tooltip.n} placettes</text>
-              </g>
-            )}
           </svg>
+
+          {tooltip && (
+            <div style={{
+              position: 'fixed', left: tooltip.cx - TW / 2, top: tooltip.cy - TH - 10,
+              width: TW, background: 'rgba(30,41,59,0.93)', borderRadius: 6,
+              padding: '7px 12px', pointerEvents: 'none', zIndex: 9999,
+            }}>
+              <div style={{ fontSize: 10, color: '#94a3b8', textAlign: 'center', marginBottom: 4 }}>{tooltip.label}</div>
+              <div style={{ fontSize: 12, color: '#fff', fontWeight: 700, textAlign: 'center' }}>{tooltip.n} placettes</div>
+            </div>
+          )}
 
           {/* Legend */}
           <div style={{ display: 'flex', gap: 20, justifyContent: 'center', marginTop: 8 }}>
             {SEGS.map(s => (
-              <div key={s.key} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#475569' }}>
+              <div key={s.key} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#bac4d0' }}>
                 <div style={{ width: 10, height: 10, borderRadius: 2, background: s.color }} />
                 {s.label}
               </div>
@@ -1343,7 +1602,6 @@ function TabControleQualite({ data }: { data: DashboardData }) {
 
 const TABS = [
   { id: 'equipe',   label: 'Équipes' },
-  { id: 'essence',  label: 'Essences' },
   { id: 'temporel', label: 'Progression' },
   { id: 'access',   label: 'Accessibilité' },
   { id: 'controle', label: 'Contrôle qualité' },
@@ -1391,14 +1649,13 @@ export function Dashboard({ onClose }: Props) {
 
   useEffect(() => {
     load();
-    // Listen for server-sent "refresh" events (fired on data import or service restart)
     const es = new EventSource('/api/dashboard/events');
     es.addEventListener('refresh', () => load());
     return () => es.close();
   }, []);
 
   return (
-    <div style={S.overlay}>
+    <div style={S.overlay} data-dashboard>
       {/* Header */}
       <div style={S.header}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
@@ -1409,14 +1666,14 @@ export function Dashboard({ onClose }: Props) {
             style={{ height: 52, width: 'auto', objectFit: 'contain', flexShrink: 0 }}
           />
           {/* Divider */}
-          <div style={{ width: 1, height: 40, background: '#e2e8f0', flexShrink: 0 }} />
+          <div style={{ width: 1, height: 40, background: 'rgba(255,255,255,0.12)', flexShrink: 0 }} />
           {/* Title */}
           <div>
-            <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-0.02em', color: '#1e293b' }}>
+            <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-0.02em', color: '#edf1f5' }}>
               Inventaire Forestier National 2026
             </h1>
             {data && (
-              <p style={{ color: '#64748b', fontSize: 14, marginTop: 3, fontWeight: 600 }}>
+              <p style={{ color: '#bac4d0', fontSize: 14, marginTop: 3, fontWeight: 600 }}>
                 DRANEF Rabat-Salé-Kénitra · {data.kpi.total_programme} placettes programmées
                 <span style={{ marginLeft: 8, fontSize: 12, color: '#94a3b8', fontWeight: 500 }}>
                     · Dernière mise à jour : <strong>{new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}</strong>
@@ -1464,19 +1721,24 @@ export function Dashboard({ onClose }: Props) {
 
       {/* KPI strip */}
       {data && !loading && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 10, padding: '4px 32px 12px', flexShrink: 0 }}>
-          {[
-            { label: 'Placettes réalisées', value: data.kpi.total_visitees, sub: `/ ${data.kpi.total_programme}`, color: '#059669' },
-            { label: 'Placettes restantes', value: data.kpi.restantes, sub: `/ ${data.kpi.total_programme}`, color: '#f97316' },
-            { label: 'Jours terrain', value: data.kpi.nb_jours_terrain, color: '#0284c7' },
-            { label: "Taux d'avancement", value: `${Number(data.kpi.pct_avancement).toFixed(1)}%`, color: '#2563eb' },
-            { label: 'Moyenne / jour', value: Math.round(Number(data.kpi.moy_par_jour)), sub: 'placettes/jour', color: '#f59e0b' },
-            { label: 'Placettes inaccessibles', value: data.accessibilite.global.nb_inaccessible ?? 0, sub: `/ ${data.kpi.total_visitees}`, color: '#ef4444', wrap: true },
-            { label: 'Placettes contrôlées', value: (data.kpi.nb_controle ?? 0) + (data.kpi.nb_controle_service ?? 0), sub: `/ ${data.kpi.total_visitees}`, color: '#8b5cf6' },
-          ].map((kpi, i) => (
-            <div key={i} style={{ ...S.card, position: 'relative', overflow: 'hidden', padding: i === 5 ? '20px 8px 16px' : '20px 16px 16px', textAlign: 'center' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 10, padding: '4px 32px 12px', flexShrink: 0 }}>
+          {(() => {
+            const prod = data.temporel.productivite.filter((e: ProductiviteEquipe) => Number(e.moy_par_jour) > 0);
+            const moyParEquipe = prod.length > 0
+              ? prod.reduce((s: number, e: ProductiviteEquipe) => s + Number(e.moy_par_jour), 0) / prod.length
+              : 0;
+            return [
+              { label: 'Placettes réalisées', value: data.kpi.total_visitees, sub: `/ ${data.kpi.total_programme}`, color: '#10b981' },
+              { label: 'Placettes restantes', value: data.kpi.restantes, sub: `/ ${data.kpi.total_programme}`, color: '#fb923c' },
+              { label: 'Jours terrain', value: data.kpi.nb_jours_terrain, color: '#0ea5e9' },
+              { label: "Taux d'avancement", value: `${Number(data.kpi.pct_avancement).toFixed(1)}%`, color: '#3b82f6' },
+              { label: 'Moyenne de placet/jour', value: moyParEquipe.toFixed(1), sub: 'placettes/équipe/jour', color: '#fbbf24' },
+              { label: 'Placettes contrôlées', value: (data.kpi.nb_controle ?? 0) + (data.kpi.nb_controle_service ?? 0), sub: `/ ${data.kpi.total_visitees}`, color: '#d946ef' },
+            ];
+          })().map((kpi, i) => (
+            <div key={i} style={{ ...S.card, position: 'relative', overflow: 'hidden', padding: '20px 16px 16px', textAlign: 'center' }}>
               <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: kpi.color, opacity: 0.6 }} />
-              <p style={{ fontSize: 12, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.02em', fontWeight: 800, marginBottom: 6, lineHeight: 1.3, whiteSpace: 'nowrap', textAlign: 'center' as const }}>{kpi.label}</p>
+              <p style={{ fontSize: 12, color: '#bac4d0', textTransform: 'uppercase', letterSpacing: '0.02em', fontWeight: 800, marginBottom: 6, lineHeight: 1.3, whiteSpace: 'nowrap', textAlign: 'center' as const }}>{kpi.label}</p>
               <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 8 }}>
                 <span style={{ fontWeight: 800, fontSize: 36, color: kpi.color, lineHeight: 1 }}>{kpi.value}</span>
                 {kpi.sub && <span style={{ color: '#94a3b8', fontSize: 13, fontWeight: 700 }}>{kpi.sub}</span>}
@@ -1490,16 +1752,16 @@ export function Dashboard({ onClose }: Props) {
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
 
         {/* LEFT — tabs + panel content */}
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', borderRight: '1px solid #e2e8f0' }}>
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', borderRight: '1px solid rgba(255,255,255,0.08)' }}>
 
           {/* Tab bar */}
-          <div style={{ display: 'flex', gap: 2, padding: '12px 24px 0', borderBottom: '1px solid #e2e8f0', flexShrink: 0 }}>
+          <div style={{ display: 'flex', gap: 2, padding: '12px 24px 0', borderBottom: '1px solid rgba(255,255,255,0.08)', flexShrink: 0 }}>
             {TABS.map(({ id, label }) => (
               <button key={id} onClick={() => setTab(id)}
                 style={{
                   background: tab === id ? 'rgba(5,150,105,0.07)' : 'transparent',
-                  border: 'none', borderBottom: `2px solid ${tab === id ? '#059669' : 'transparent'}`,
-                  color: tab === id ? '#059669' : '#64748b',
+                  border: 'none', borderBottom: `2px solid ${tab === id ? '#10b981' : 'transparent'}`,
+                  color: tab === id ? '#10b981' : '#bac4d0',
                   cursor: 'pointer', padding: '10px 14px', fontSize: 13, fontWeight: 700, flex: 1, textAlign: 'center' as const, whiteSpace: 'nowrap' as const,
                   transition: 'all 0.2s', marginBottom: -1,
                 }}>
@@ -1517,8 +1779,8 @@ export function Dashboard({ onClose }: Props) {
             )}
             {error && !loading && (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 256, gap: 16 }}>
-                <p style={{ color: '#dc2626', fontSize: 14 }}>Erreur : {error}</p>
-                <button onClick={load} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', textDecoration: 'underline', fontSize: 12 }}>
+                <p style={{ color: '#ef4444', fontSize: 14 }}>Erreur : {error}</p>
+                <button onClick={load} style={{ background: 'none', border: 'none', color: '#7a8a9c', cursor: 'pointer', textDecoration: 'underline', fontSize: 12 }}>
                   Réessayer
                 </button>
               </div>
@@ -1526,7 +1788,6 @@ export function Dashboard({ onClose }: Props) {
             {data && !loading && (
               <>
                 {tab === 'equipe'   && <TabEquipe data={data} />}
-                {tab === 'essence'  && <TabEssence data={data} />}
                 {tab === 'temporel' && <TabTemporel data={data} />}
                 {tab === 'access'   && <TabAccessibilite data={data} />}
                 {tab === 'controle' && <TabControleQualite data={data} />}
@@ -1542,7 +1803,7 @@ export function Dashboard({ onClose }: Props) {
             : <div style={{
                 flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
                 color: '#94a3b8', fontSize: 13,
-                background: '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0',
+                background: '#1a2540', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)',
               }}>
                 {loading ? 'Chargement de la carte…' : ''}
               </div>

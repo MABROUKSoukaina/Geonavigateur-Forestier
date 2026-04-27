@@ -1,9 +1,9 @@
 -- ─────────────────────────────────────────────────────────────────────────────
--- Trigger: set date_modified on plot from collect_ifn.collect.ofc_record
+-- Trigger: set date_created and date_modified on plot from collect_ifn.collect.ofc_record
 --
--- On every INSERT or UPDATE of the plot table, this trigger fetches
--- date_modified from the collect_ifn database (collect.ofc_record) via dblink,
--- matching on plot_no.
+-- On every INSERT or UPDATE of the plot table, this trigger fetches both
+-- date_created and date_modified from the collect_ifn database (collect.ofc_record)
+-- via dblink, matching on key1 (= plot_no). Picks the most recent record.
 -- Falls back to NOW() if the row is not found or if the remote DB is unreachable.
 -- ─────────────────────────────────────────────────────────────────────────────
 
@@ -11,31 +11,35 @@
 CREATE EXTENSION IF NOT EXISTS dblink;
 
 -- Step 2: Trigger function
-CREATE OR REPLACE FUNCTION set_plot_date_modified()
+CREATE OR REPLACE FUNCTION public.set_plot_date_modified()
 RETURNS TRIGGER AS $$
 DECLARE
-  v_date TIMESTAMP WITHOUT TIME ZONE;
+  v_date_created  TIMESTAMP WITHOUT TIME ZONE;
+  v_date_modified TIMESTAMP WITHOUT TIME ZONE;
 BEGIN
   BEGIN
-    SELECT t.date_modified INTO v_date
+    SELECT t.date_created, t.date_modified
+      INTO v_date_created, v_date_modified
     FROM dblink(
       'host=localhost port=5432 dbname=collect_ifn user=postgres password=postgres',
       format(
-        'SELECT date_modified FROM collect.ofc_record WHERE plot_no = %L LIMIT 1',
+        'SELECT date_created, date_modified FROM collect.ofc_record WHERE key1 = %L ORDER BY date_modified DESC LIMIT 1',
         NEW.plot_no
       )
-    ) AS t(date_modified TIMESTAMP WITHOUT TIME ZONE);
+    ) AS t(date_created TIMESTAMP WITHOUT TIME ZONE, date_modified TIMESTAMP WITHOUT TIME ZONE);
   EXCEPTION WHEN OTHERS THEN
-    -- Remote DB unreachable or query failed → fall back to NOW()
-    v_date := NULL;
+    -- Remote DB unreachable or query failed → fall back to NULL
+    v_date_created  := NULL;
+    v_date_modified := NULL;
   END;
 
-  NEW.date_modified := COALESCE(v_date, NOW());
+  NEW.date_created  := COALESCE(v_date_created,  NOW());
+  NEW.date_modified := COALESCE(v_date_modified, NOW());
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
--- Step 3: Attach trigger (drop first to allow re-running this script safely)
+-- Step 3: Recreate trigger (drop first to allow re-running this script safely)
 DROP TRIGGER IF EXISTS trg_plot_date_modified ON plot;
 
 CREATE TRIGGER trg_plot_date_modified
