@@ -392,6 +392,13 @@ function TabEquipe({ data }: { data: DashboardData }) {
   const moyGlobale = productivite.length > 0
     ? productivite.reduce((s: number, eq: ProductiviteEquipe) => s + Number(eq.moy_par_jour || 0), 0) / productivite.length
     : 0;
+
+  const sreaTotal    = 108;
+  const sreaRealise  = (data.kpi.nb_controle ?? 0);
+  const sreaRestant  = Math.max(sreaTotal - sreaRealise, 0);
+  const sreaPct      = sreaTotal > 0 ? (sreaRealise / sreaTotal) * 100 : 0;
+  const sreaColor    = '#d946ef';
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
@@ -430,6 +437,38 @@ function TabEquipe({ data }: { data: DashboardData }) {
           );
         })}
       </div>
+
+      {/* ── Equipe SREA (contrôle) ── */}
+      <div style={{ ...S.card, position: 'relative', overflow: 'hidden', padding: 20 }}>
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: sreaColor }} />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <div>
+              <p style={{ fontSize: 11, color: '#94a3b8', marginBottom: 4 }}>Équipe de contrôle</p>
+              <p style={{ fontSize: 14, fontWeight: 600, color: sreaColor }}>Équipe SREA</p>
+            </div>
+            <div style={{ position: 'relative', flexShrink: 0 }}>
+              <ProgressRing pct={sreaPct} size={56} stroke={5} color={sreaColor} />
+              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 11, color: sreaColor }}>{sreaPct.toFixed(1)}%</span>
+              </div>
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, flex: 1, maxWidth: 400, textAlign: 'center', fontSize: 11 }}>
+            {[
+              { label: 'Total', val: sreaTotal, color: undefined },
+              { label: 'Contrôlées', val: sreaRealise, color: '#10b981' },
+              { label: 'Restantes', val: sreaRestant, color: '#f87171' },
+            ].map(({ label, val, color: c }) => (
+              <div key={label} style={{ background: '#0b1629', borderRadius: 8, padding: '8px 4px' }}>
+                <p style={{ color: '#94a3b8', fontSize: 9, marginBottom: 2 }}>{label}</p>
+                <p style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 16, color: c ?? '#edf1f5' }}>{val}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
       {/* Per-team productivity */}
       <Card title="Moyenne des placettes réalisées par équipe">
         <div style={{ position: 'relative' }}>
@@ -463,6 +502,31 @@ function TabEquipe({ data }: { data: DashboardData }) {
             );
           })}
         </div>
+
+        {/* SREA linear card */}
+        {(() => {
+          const sreaColor = '#d946ef';
+          const sreaDays = data.temporel.sreaParJour;
+          const sreaNbJours = sreaDays.length;
+          const sreaTotal = sreaDays.reduce((s, d) => s + (d as { date_visite: string; nb_visite: number }).nb_visite, 0);
+          const sreaMoy = sreaNbJours > 0 ? sreaTotal / sreaNbJours : 0;
+          return (
+            <div style={{ ...S.card, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', marginTop: 10, position: 'relative', overflow: 'hidden' }}>
+              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: sreaColor }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: sreaColor, flexShrink: 0 }} />
+                <p style={{ fontSize: 13, fontWeight: 600, color: sreaColor }}>Équipe SREA</p>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+                <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 24, color: sreaColor }}>{sreaMoy.toFixed(1)}</span>
+                <span style={{ color: '#7a8a9c', fontSize: 12 }}>/ jour</span>
+              </div>
+              <p style={{ fontSize: 11, color: '#94a3b8' }}>
+                {sreaTotal} contrôlées · {sreaNbJours} jours travaillés
+              </p>
+            </div>
+          );
+        })()}
       </Card>
 
       <Card title="Répartition des placettes par équipe">
@@ -953,7 +1017,7 @@ function MiniTeamBarChart({ days, color, fullWidth = false }: {
 
 function TabTemporel({ data }: { data: DashboardData }) {
   const { temporel, kpi } = data;
-  const { visitesParJour, moyParJourEquipe } = temporel;
+  const { visitesParJour, moyParJourEquipe, sreaParJour } = temporel;
   const moy = Number(kpi.moy_par_jour);
   const remaining = kpi.restantes ?? kpi.total_programme - kpi.total_visitees;
   const jrsRestants = moy > 0 ? Math.ceil(remaining / moy) : '—';
@@ -1023,6 +1087,26 @@ function TabTemporel({ data }: { data: DashboardData }) {
             </div>
           );
         })}
+        {/* SREA control team */}
+        {sreaParJour.length > 0 && (() => {
+          const sreaColor = '#d946ef';
+          const total = sreaParJour.reduce((s, d) => s + (d as { date_visite: string; nb_visite: number }).nb_visite, 0);
+          return (
+            <div style={{ ...S.card, padding: 16, position: 'relative', overflow: 'hidden', gridColumn: 'span 2' }}>
+              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: sreaColor }} />
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: sreaColor, flexShrink: 0 }} />
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#edf1f5' }}>Équipe SREA</span>
+                </div>
+                <span style={{ fontSize: 11, color: '#94a3b8', fontFamily: 'monospace' }}>
+                  {total} contrôlée{total > 1 ? 's' : ''}
+                </span>
+              </div>
+              <MiniTeamBarChart days={sreaParJour as { date_visite: string; nb_visite: number }[]} color={sreaColor} />
+            </div>
+          );
+        })()}
       </div>
       </Card>
 
@@ -1082,6 +1166,30 @@ function TabTemporel({ data }: { data: DashboardData }) {
                   </div>
                 );
               })}
+              {/* SREA in modal */}
+              {sreaParJour.length > 0 && (() => {
+                const sreaColor = '#d946ef';
+                const total = sreaParJour.reduce((s, d) => s + (d as { date_visite: string; nb_visite: number }).nb_visite, 0);
+                return (
+                  <div style={{
+                    background: '#162035', borderRadius: 12,
+                    border: '1px solid rgba(255,255,255,0.07)',
+                    position: 'relative', overflow: 'hidden', flexShrink: 0,
+                  }}>
+                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: sreaColor }} />
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px 10px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ width: 10, height: 10, borderRadius: '50%', background: sreaColor }} />
+                        <span style={{ fontSize: 14, fontWeight: 600, color: '#edf1f5' }}>Équipe SREA</span>
+                      </div>
+                      <span style={{ fontSize: 12, color: '#94a3b8', fontFamily: 'monospace' }}>
+                        {total} contrôlée{total > 1 ? 's' : ''}
+                      </span>
+                    </div>
+                    <MiniTeamBarChart days={sreaParJour} color={sreaColor} fullWidth />
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>
@@ -1093,9 +1201,9 @@ function TabTemporel({ data }: { data: DashboardData }) {
 
 // Series definition for accessibility (used in both chart and header)
 const ACC_SERIES = [
-  { key: 'nb_a_pied_0'  as const, label: '< 100 m',       color: '#34d399', bg: '#f0fdf4' },
-  { key: 'nb_a_pied_1'  as const, label: '100 – 500 m',   color: '#f59e0b', bg: '#fffbeb' },
-  { key: 'nb_a_pied_2'  as const, label: '> 500 m',       color: '#f97316', bg: '#fff7ed' },
+  { key: 'nb_a_pied_0'  as const, label: 'Placettes < 100 m',       color: '#34d399', bg: '#f0fdf4' },
+  { key: 'nb_a_pied_1'  as const, label: 'Placettes 100 – 500 m',   color: '#f59e0b', bg: '#fffbeb' },
+  { key: 'nb_a_pied_2'  as const, label: 'Placettes > 500 m',       color: '#f97316', bg: '#fff7ed' },
 ] as const;
 
 // ─── Grouped SVG bar chart ────────────────────────────────────────────────────
@@ -1111,7 +1219,7 @@ function GroupedBarChart({ equipes }: { equipes: AccessibiliteEquipe[] }) {
   }
 
   // SVG viewport
-  const ML = 44, MR = 20, MT = 24, MB = 72;
+  const ML = 44, MR = 20, MT = 24, MB = 40;
   const VW = 660, VH = 300;
   const cW = VW - ML - MR;
   const cH = VH - MT - MB;
@@ -1197,19 +1305,17 @@ function GroupedBarChart({ equipes }: { equipes: AccessibiliteEquipe[] }) {
         );
       })}
 
-      {/* Legend row — centered */}
-      {(() => {
-        const ITEM_W = 110;
-        const startX = (VW - ACC_SERIES.length * ITEM_W) / 2;
-        return ACC_SERIES.map((s, i) => (
-          <g key={s.key} transform={`translate(${startX + i * ITEM_W}, ${legendY})`}>
-            <rect width={10} height={10} fill={s.color} rx={2} />
-            <text x={14} y={9} fontSize={11} fill="#bac4d0">{s.label}</text>
-          </g>
-        ));
-      })()}
-
     </svg>
+
+    {/* Legend */}
+    <div style={{ display: 'flex', justifyContent: 'center', gap: 32, marginTop: 10 }}>
+      {ACC_SERIES.map(s => (
+        <div key={s.key} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#bac4d0' }}>
+          <div style={{ width: 10, height: 10, borderRadius: 2, background: s.color, flexShrink: 0 }} />
+          {s.label}
+        </div>
+      ))}
+    </div>
 
     {tooltip && (
       <div style={{
@@ -1307,10 +1413,10 @@ function AccessParEquipeChart({ equipes }: { equipes: AccessibiliteEquipe[] }) {
       {/* Legend */}
       <div style={{ display: 'flex', gap: 20, marginTop: 8, justifyContent: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#bac4d0' }}>
-          <div style={{ width: 12, height: 12, borderRadius: 2, background: '#10b981' }} /> Accessible
+          <div style={{ width: 12, height: 12, borderRadius: 2, background: '#10b981' }} /> Placettes accessibles
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#bac4d0' }}>
-          <div style={{ width: 12, height: 12, borderRadius: 2, background: '#f87171' }} /> Inaccessible
+          <div style={{ width: 12, height: 12, borderRadius: 2, background: '#f87171' }} /> Placettes inaccessibles
         </div>
       </div>
     </div>
@@ -1371,7 +1477,7 @@ function TabAccessibilite({ data }: { data: DashboardData }) {
       </Card>
 
       {/* ── Multi-series bar chart per équipe ── */}
-      <Card title="Distance parcourue à pied par équipe">
+      <Card title="Accessibilité à pied par équipe">
         <GroupedBarChart equipes={activeEquipes} />
       </Card>
 
@@ -1481,27 +1587,28 @@ function TabControleQualite({ data }: { data: DashboardData }) {
     .map(([equipe, ctrl]) => {
       const eq = equipes.find(e => e.equipe === equipe);
       const totalVisite = eq?.total_visite ?? 0;
-      const nonCtrl = Math.max(totalVisite - ctrl, 0);
+      const nonCtrl = totalVisite;
       return { equipe, nonCtrl, ctrl, total: nonCtrl + ctrl };
     })
     .sort((a, b) => byNum(a.equipe) - byNum(b.equipe));
 
-  const yMax  = Math.max(...rows.map(r => r.total), 1);
+  const yMax  = Math.max(...rows.map(r => Math.max(r.nonCtrl, r.ctrl)), 1);
   const ML = 36, MR = 16, MT = 24, MB = 52;
   const cH = 220;
   const VH = MT + cH + MB;
   const VW = 560;
   const cW = VW - ML - MR;
-  const BAR_W  = Math.min(52, Math.floor(cW / rows.length * 0.55));
-  const BAR_GAP = Math.floor(cW / rows.length) - BAR_W;
-  const toX = (i: number) => ML + i * (BAR_W + BAR_GAP) + BAR_GAP / 2;
+  const GROUP_W = Math.floor(cW / rows.length);
+  const BAR_W   = Math.min(22, Math.floor(GROUP_W * 0.35));
+  const BAR_GAP = 3;
+  const toX = (i: number, seg: number) => ML + i * GROUP_W + (GROUP_W - BAR_W * 2 - BAR_GAP) / 2 + seg * (BAR_W + BAR_GAP);
   const toY = (v: number) => MT + cH - (v / yMax) * cH;
   const Y_TICKS = 5;
   const TW = 190, TH = 44;
 
   const SEGS = [
-    { key: 'nonCtrl' as const, color: '#34d399', label: 'Réalisées non contrôlées' },
-    { key: 'ctrl'    as const, color: '#d946ef', label: 'Contrôlées' },
+    { key: 'nonCtrl' as const, color: '#34d399', label: 'Placettes réalisées' },
+    { key: 'ctrl'    as const, color: '#d946ef', label: 'Placettes contrôlées' },
   ];
 
   return (
@@ -1511,7 +1618,7 @@ function TabControleQualite({ data }: { data: DashboardData }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
         {[
           { label: 'Placettes contrôlées',      value: controle,                 pct: +((controle / (realise || 1)) * 100).toFixed(1), color: '#d946ef', bg: 'rgba(217,70,239,0.07)' },
-          { label: 'Placettes non contrôlées',   value: realise - controle,       pct: +(((realise - controle) / (realise || 1)) * 100).toFixed(1), color: '#34d399', bg: 'rgba(16,185,129,0.07)' },
+          { label: 'Placettes réalisées',          value: realise - controle,       pct: +(((realise - controle) / (realise || 1)) * 100).toFixed(1), color: '#34d399', bg: 'rgba(16,185,129,0.07)' },
           { label: 'Taux de contrôle',           value: `${pctCtrl.toFixed(1)}%`, pct: null,                                                       color: '#0ea5e9', bg: 'rgba(2,132,199,0.07)' },
         ].map(s => (
           <div key={s.label} style={{ ...S.card, background: s.bg, padding: '10px 6px 2px', textAlign: 'center', borderLeft: `4px solid ${s.color}` }}>
@@ -1542,29 +1649,28 @@ function TabControleQualite({ data }: { data: DashboardData }) {
 
             {/* Bars */}
             {rows.map((r, i) => {
-              const bx = toX(i);
-              let cumY = MT + cH;
+              const groupCx = ML + i * GROUP_W + GROUP_W / 2;
               return (
                 <g key={r.equipe}>
-                  {SEGS.map(seg => {
+                  {SEGS.map((seg, si) => {
                     const n  = r[seg.key];
-                    if (n === 0) return null;
+                    const bx = toX(i, si);
                     const bh = (n / yMax) * cH;
-                    cumY -= bh;
-                    const segY = cumY;
+                    const by = toY(n);
                     return (
-                      <rect key={seg.key} x={bx} y={segY} width={BAR_W} height={bh}
-                        fill={seg.color} rx={0} opacity={0.88} style={{ cursor: 'pointer' }}
-                        onMouseEnter={ev => setTooltip({ cx: ev.clientX, cy: ev.clientY, label: `${getNoun(r.equipe)} — ${seg.label}`, n })}
-                        onMouseLeave={() => setTooltip(null)} />
+                      <g key={seg.key}>
+                        <rect x={bx} y={by} width={BAR_W} height={bh}
+                          fill={seg.color} rx={2} opacity={0.88} style={{ cursor: 'pointer' }}
+                          onMouseEnter={ev => setTooltip({ cx: ev.clientX, cy: ev.clientY, label: `${getNoun(r.equipe)} — ${seg.label}`, n })}
+                          onMouseLeave={() => setTooltip(null)} />
+                        <text x={bx + BAR_W / 2} y={by - 4} textAnchor="middle" fontSize={9} fill="#bac4d0" fontWeight="700">{n}</text>
+                      </g>
                     );
                   })}
-                  {/* Total */}
-                  <text x={bx + BAR_W / 2} y={toY(r.total) - 5} textAnchor="middle" fontSize={10} fill="#bac4d0" fontWeight="700">{r.total}</text>
                   {/* Equipe N° */}
-                  <text x={bx + BAR_W / 2} y={MT + cH + 14} textAnchor="middle" fontSize={10} fill="#bac4d0" fontWeight="600">{getNum(r.equipe)}</text>
+                  <text x={groupCx} y={MT + cH + 14} textAnchor="middle" fontSize={10} fill="#bac4d0" fontWeight="600">{getNum(r.equipe)}</text>
                   {/* Equipe noun */}
-                  <text x={bx + BAR_W / 2} y={MT + cH + 28} textAnchor="middle" fontSize={8.5} fill="#dde4ec">{getNoun(r.equipe)}</text>
+                  <text x={groupCx} y={MT + cH + 28} textAnchor="middle" fontSize={8.5} fill="#dde4ec">{getNoun(r.equipe)}</text>
                 </g>
               );
             })}
@@ -1609,17 +1715,19 @@ const TABS = [
 
 type TabId = (typeof TABS)[number]['id'];
 
-interface Props { onClose: () => void; }
+interface Props { onLogout?: () => void; }
 
-export function Dashboard({ onClose }: Props) {
+export function Dashboard({ onLogout }: Props) {
   const navigate = useNavigate();
-  const handleClose = () => { onClose(); navigate('/'); };
+  const username = localStorage.getItem('jwt_username') ?? '';
+  const isAdmin = username === 'admin';
   const [tab, setTab] = useState<TabId>('equipe');
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const [importMsg, setImportMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const [confirmLogout, setConfirmLogout] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const load = async () => {
@@ -1676,7 +1784,7 @@ export function Dashboard({ onClose }: Props) {
               <p style={{ color: '#bac4d0', fontSize: 14, marginTop: 3, fontWeight: 600 }}>
                 DRANEF Rabat-Salé-Kénitra · {data.kpi.total_programme} placettes programmées
                 <span style={{ marginLeft: 8, fontSize: 12, color: '#94a3b8', fontWeight: 500 }}>
-                    · Dernière mise à jour : <strong>{new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}</strong>
+                    · Dernière mise à jour : <strong>{data.kpi.derniere_visite ? new Date(data.kpi.derniere_visite).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' }) : '—'}</strong>
                   </span>
               </p>
             )}
@@ -1694,33 +1802,125 @@ export function Dashboard({ onClose }: Props) {
               {importMsg.text}
             </span>
           )}
-          {/* Hidden file input */}
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".csv"
-            style={{ display: 'none' }}
-            onChange={handleImport}
-          />
-          {/* Import CSV button */}
-          <button
-            onClick={() => fileRef.current?.click()}
-            disabled={importing}
-            title="Importer des placettes (CSV)"
-            style={{ ...S.iconBtn, opacity: importing ? 0.4 : 1, fontSize: 18 }}
-          >
-            ↓
-          </button>
+          {/* Import CSV — admin only */}
+          {isAdmin && (
+            <>
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".csv"
+                style={{ display: 'none' }}
+                onChange={handleImport}
+              />
+              <button
+                onClick={() => fileRef.current?.click()}
+                disabled={importing}
+                title={importing ? 'Importation en cours…' : 'Importer des placettes (CSV)'}
+                style={{ ...S.iconBtn, color: importing ? '#10b981' : '#94a3b8' }}
+              >
+                {importing ? (
+                  <>
+                    <style>{`@keyframes ifn-spin{to{transform:rotate(360deg)}}`}</style>
+                    <div style={{
+                      width: 18, height: 18, borderRadius: '50%',
+                      border: '2px solid rgba(16,185,129,0.25)',
+                      borderTopColor: '#10b981',
+                      animation: 'ifn-spin 0.75s linear infinite',
+                    }} />
+                  </>
+                ) : (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                )}
+              </button>
+            </>
+          )}
           <button onClick={load} disabled={loading} title="Rafraîchir"
             style={{ ...S.iconBtn, opacity: loading ? 0.4 : 1 }}>
-            ↺
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="23 4 23 10 17 10" />
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+            </svg>
           </button>
-          <button onClick={handleClose} title="Fermer" style={S.iconBtn}>✕</button>
+          {onLogout && (
+            <>
+              {/* Logout button + confirmation popover */}
+              <div style={{ position: 'relative' }}>
+                <button
+                  onClick={() => setConfirmLogout(v => !v)}
+                  title="Se déconnecter"
+                  style={{ ...S.iconBtn, color: confirmLogout ? '#f87171' : '#94a3b8' }}
+                  onMouseEnter={e => { e.currentTarget.style.color = '#f87171'; }}
+                  onMouseLeave={e => { if (!confirmLogout) e.currentTarget.style.color = '#94a3b8'; }}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                    <polyline points="16 17 21 12 16 7" />
+                    <line x1="21" y1="12" x2="9" y2="12" />
+                  </svg>
+                </button>
+                {confirmLogout && (
+                  <div style={{
+                    position: 'absolute', top: 'calc(100% + 8px)', right: 0, zIndex: 100,
+                    background: '#1e2d3e', border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: 10, padding: '12px 14px',
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+                    minWidth: 170, display: 'flex', flexDirection: 'column', gap: 10,
+                  }}>
+                    <p style={{ fontSize: 12, color: '#cbd5e1', margin: 0, fontWeight: 600 }}>Se déconnecter ?</p>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button onClick={() => setConfirmLogout(false)} style={{
+                        flex: 1, padding: '6px 0', borderRadius: 6, fontSize: 12, fontWeight: 600,
+                        background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+                        color: '#94a3b8', cursor: 'pointer',
+                      }}>Annuler</button>
+                      <button onClick={onLogout} style={{
+                        flex: 1, padding: '6px 0', borderRadius: 6, fontSize: 12, fontWeight: 600,
+                        background: 'rgba(248,113,113,0.15)', border: '1px solid rgba(248,113,113,0.3)',
+                        color: '#f87171', cursor: 'pointer',
+                      }}>Confirmer</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Username chip */}
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 7,
+                padding: '5px 10px', borderRadius: 8,
+                background: 'rgba(255,255,255,0.04)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                color: '#94a3b8', fontSize: 12, fontWeight: 600, letterSpacing: '0.02em',
+              }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                  <circle cx="12" cy="7" r="4" />
+                </svg>
+                {username}
+              </div>
+            </>
+          )}
         </div>
       </div>
 
+      {/* KPI strip skeleton */}
+      {loading && !data && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 10, padding: '4px 32px 12px', flexShrink: 0 }}>
+          <style>{`@keyframes ifn-shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}`}</style>
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} style={{ ...S.card, padding: '20px 16px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: '70%', height: 10, borderRadius: 4, background: 'linear-gradient(90deg,rgba(255,255,255,0.04) 25%,rgba(255,255,255,0.09) 50%,rgba(255,255,255,0.04) 75%)', backgroundSize: '200% 100%', animation: 'ifn-shimmer 1.4s ease-in-out infinite' }} />
+              <div style={{ width: '50%', height: 28, borderRadius: 6, background: 'linear-gradient(90deg,rgba(255,255,255,0.04) 25%,rgba(255,255,255,0.09) 50%,rgba(255,255,255,0.04) 75%)', backgroundSize: '200% 100%', animation: 'ifn-shimmer 1.4s ease-in-out infinite' }} />
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* KPI strip */}
-      {data && !loading && (
+      {data && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 10, padding: '4px 32px 12px', flexShrink: 0 }}>
           {(() => {
             const prod = data.temporel.productivite.filter((e: ProductiviteEquipe) => Number(e.moy_par_jour) > 0);
@@ -1732,7 +1932,7 @@ export function Dashboard({ onClose }: Props) {
               { label: 'Placettes restantes', value: data.kpi.restantes, sub: `/ ${data.kpi.total_programme}`, color: '#fb923c' },
               { label: 'Jours terrain', value: data.kpi.nb_jours_terrain, color: '#0ea5e9' },
               { label: "Taux d'avancement", value: `${Number(data.kpi.pct_avancement).toFixed(1)}%`, color: '#3b82f6' },
-              { label: 'Moyenne de placet/jour', value: moyParEquipe.toFixed(1), sub: 'placettes/équipe/jour', color: '#fbbf24' },
+              { label: 'Moyenne par jour', value: moyParEquipe.toFixed(1), sub: 'placettes/équipe/jour', color: '#fbbf24' },
               { label: 'Placettes contrôlées', value: (data.kpi.nb_controle ?? 0) + (data.kpi.nb_controle_service ?? 0), sub: `/ ${data.kpi.total_visitees}`, color: '#d946ef' },
             ];
           })().map((kpi, i) => (
@@ -1772,9 +1972,15 @@ export function Dashboard({ onClose }: Props) {
 
           {/* Panel content */}
           <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
-            {loading && (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 256, color: '#94a3b8', fontSize: 14 }}>
-                Chargement des statistiques…
+            {loading && !data && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                {/* Two large skeleton cards + one row of smaller ones */}
+                {[1, 0.55, 0.7].map((h, i) => (
+                  <div key={i} style={{ ...S.card, height: i === 0 ? 180 : 120, display: 'flex', flexDirection: 'column', gap: 12, padding: 20 }}>
+                    <div style={{ width: '35%', height: 10, borderRadius: 4, background: 'linear-gradient(90deg,rgba(255,255,255,0.04) 25%,rgba(255,255,255,0.09) 50%,rgba(255,255,255,0.04) 75%)', backgroundSize: '200% 100%', animation: 'ifn-shimmer 1.4s ease-in-out infinite' }} />
+                    <div style={{ flex: 1, borderRadius: 6, background: 'linear-gradient(90deg,rgba(255,255,255,0.04) 25%,rgba(255,255,255,0.09) 50%,rgba(255,255,255,0.04) 75%)', backgroundSize: '200% 100%', animation: 'ifn-shimmer 1.4s ease-in-out infinite' }} />
+                  </div>
+                ))}
               </div>
             )}
             {error && !loading && (
@@ -1785,7 +1991,7 @@ export function Dashboard({ onClose }: Props) {
                 </button>
               </div>
             )}
-            {data && !loading && (
+            {data && (
               <>
                 {tab === 'equipe'   && <TabEquipe data={data} />}
                 {tab === 'temporel' && <TabTemporel data={data} />}
@@ -1798,7 +2004,7 @@ export function Dashboard({ onClose }: Props) {
 
         {/* RIGHT — permanent map panel */}
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0, padding: 12 }}>
-          {data && !loading
+          {data
             ? <TabCarte data={data} />
             : <div style={{
                 flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',

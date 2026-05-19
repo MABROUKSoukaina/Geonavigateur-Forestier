@@ -84,12 +84,18 @@ public class DashboardController {
         long totalProgramme = ((Number) kpi.get("total_programme")).longValue();
         long nbJours = ((Number) kpi.getOrDefault("nb_jours_terrain", 1L)).longValue();
 
-        kpi.put("nb_controle",      ctrl);
+        // Last realized plot date
+        java.time.LocalDate lastVisit = jdbc.queryForObject(
+                "SELECT MAX(DATE(date_modified)) FROM plot WHERE plot_no NOT LIKE '%C' AND plot_no NOT LIKE '%CS'",
+                java.time.LocalDate.class);
+
+        kpi.put("nb_controle",         ctrl);
         kpi.put("nb_controle_service", ctrlCS);
-        kpi.put("total_visitees",   totalVisitees);
-        kpi.put("restantes",        totalProgramme - totalVisitees);
-        kpi.put("pct_avancement",   totalProgramme > 0 ? (totalVisitees * 100.0 / totalProgramme) : 0.0);
-        kpi.put("moy_par_jour",     nbJours > 0 ? (totalVisitees * 1.0 / nbJours) : 0.0);
+        kpi.put("total_visitees",      totalVisitees);
+        kpi.put("restantes",           totalProgramme - totalVisitees);
+        kpi.put("pct_avancement",      totalProgramme > 0 ? (totalVisitees * 100.0 / totalProgramme) : 0.0);
+        kpi.put("moy_par_jour",        nbJours > 0 ? (totalVisitees * 1.0 / nbJours) : 0.0);
+        kpi.put("derniere_visite",     lastVisit != null ? lastVisit.toString() : null);
 
         return ResponseEntity.ok(kpi);
     }
@@ -108,9 +114,9 @@ public class DashboardController {
                 "  COUNT(prog.num_placette) - COALESCE(SUM(CASE WHEN pl.plot_no IS NOT NULL THEN 1 ELSE 0 END), 0) AS restantes, " +
                 "  ROUND(COALESCE(SUM(CASE WHEN pl.plot_no IS NOT NULL THEN 1 ELSE 0 END), 0) " +
                 "        * 100.0 / NULLIF(COUNT(prog.num_placette), 0), 1)                    AS pct_avancement, " +
-                "  COUNT(DISTINCT DATE(pl.date_created))                                      AS nb_jours, " +
+                "  COUNT(DISTINCT DATE(pl.date_modified))                                     AS nb_jours, " +
                 "  ROUND(COALESCE(SUM(CASE WHEN pl.plot_no IS NOT NULL THEN 1 ELSE 0 END), 0) * 1.0 / " +
-                "        NULLIF(COUNT(DISTINCT DATE(pl.date_created)), 0), 1)                 AS moy_par_jour " +
+                "        NULLIF(COUNT(DISTINCT DATE(pl.date_modified)), 0), 1)                AS moy_par_jour " +
                 "FROM ifn_programme prog " +
                 "LEFT JOIN plot pl ON pl.plot_no = prog.num_placette AND pl.plot_no NOT LIKE '%C' AND pl.plot_no NOT LIKE '%CS' " +
                 "WHERE prog.equipe IS NOT NULL " +
@@ -204,21 +210,30 @@ public class DashboardController {
                 "SELECT prog.equipe, " +
                 "  COUNT(prog.num_placette)                                                  AS total_affecte, " +
                 "  COUNT(pl.plot_no)                                                         AS total_visite, " +
-                "  COUNT(DISTINCT DATE(pl.date_created))                                     AS nb_jours, " +
+                "  COUNT(DISTINCT DATE(pl.date_modified))                                    AS nb_jours, " +
                 "  ROUND(COUNT(pl.plot_no) * 1.0 / " +
-                "        NULLIF(COUNT(DISTINCT DATE(pl.date_created)), 0), 1)                AS moy_par_jour, " +
+                "        NULLIF(COUNT(DISTINCT DATE(pl.date_modified)), 0), 1)               AS moy_par_jour, " +
                 "  CEIL((COUNT(prog.num_placette) - COUNT(pl.plot_no)) * 1.0 / " +
                 "       NULLIF(ROUND(COUNT(pl.plot_no) * 1.0 / " +
-                "              NULLIF(COUNT(DISTINCT DATE(pl.date_created)), 0), 1), 0))     AS jours_restants_estimes " +
+                "              NULLIF(COUNT(DISTINCT DATE(pl.date_modified)), 0), 1), 0))    AS jours_restants_estimes " +
                 "FROM ifn_programme prog " +
                 "LEFT JOIN plot pl ON pl.plot_no = prog.num_placette AND pl.plot_no NOT LIKE '%C' AND pl.plot_no NOT LIKE '%CS' " +
                 "WHERE prog.equipe IS NOT NULL " +
                 "GROUP BY prog.equipe " +
                 "ORDER BY CAST(REGEXP_REPLACE(prog.equipe, '.*N°(\\d+).*', '\\1') AS INTEGER)");
+        // SREA control team: C plots only (not CS), grouped by day
+        List<Map<String, Object>> sreaParJour = jdbc.queryForList(
+                "SELECT DATE(date_modified) AS date_visite, COUNT(*) AS nb_visite " +
+                "FROM plot " +
+                "WHERE plot_no LIKE '%C' AND plot_no NOT LIKE '%CS' " +
+                "GROUP BY DATE(date_modified) " +
+                "ORDER BY date_visite");
+
         return ResponseEntity.ok(Map.of(
                 "visitesParJour", parJour,
                 "moyParJourEquipe", moyEquipe,
-                "productivite", productivite
+                "productivite", productivite,
+                "sreaParJour", sreaParJour
         ));
     }
 
@@ -357,5 +372,159 @@ public class DashboardController {
         return ResponseEntity.ok(
             jdbc.queryForList("SELECT equipe, nb_controle_service FROM v_controle_service_par_equipe")
         );
+    }
+
+    /**
+     * GET /api/dashboard/all
+     * Single endpoint returning all dashboard data in one round-trip.
+     * Replaces the 10 individual calls made by the frontend.
+     */
+    @GetMapping("/all")
+    public ResponseEntity<Map<String, Object>> getAllDashboard() {
+        Map<String, Object> result = new LinkedHashMap<>();
+
+        // ── KPI ──────────────────────────────────────────────────────────────
+        List<Map<String, Object>> kpiRows = jdbc.queryForList("SELECT * FROM v_kpi_global");
+        Map<String, Object> kpi = kpiRows.isEmpty() ? new LinkedHashMap<>() : new LinkedHashMap<>(kpiRows.get(0));
+
+        Long nbControle = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM plot WHERE plot_no LIKE '%C' AND plot_no NOT LIKE '%CS'", Long.class);
+        Long nbControleService = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM plot WHERE plot_no LIKE '%CS'", Long.class);
+        long ctrl   = nbControle       != null ? nbControle       : 0L;
+        long ctrlCS = nbControleService != null ? nbControleService : 0L;
+        long totalVisitees  = kpi.isEmpty() ? 0L : ((Number) kpi.get("total_visitees")).longValue();
+        long totalProgramme = kpi.isEmpty() ? 0L : ((Number) kpi.get("total_programme")).longValue();
+        long nbJours        = kpi.isEmpty() ? 1L : ((Number) kpi.getOrDefault("nb_jours_terrain", 1L)).longValue();
+        java.time.LocalDate lastVisit = jdbc.queryForObject(
+                "SELECT MAX(DATE(date_modified)) FROM plot WHERE plot_no NOT LIKE '%C' AND plot_no NOT LIKE '%CS'",
+                java.time.LocalDate.class);
+        kpi.put("nb_controle",         ctrl);
+        kpi.put("nb_controle_service", ctrlCS);
+        kpi.put("total_visitees",      totalVisitees);
+        kpi.put("restantes",           totalProgramme - totalVisitees);
+        kpi.put("pct_avancement",      totalProgramme > 0 ? (totalVisitees * 100.0 / totalProgramme) : 0.0);
+        kpi.put("moy_par_jour",        nbJours > 0 ? (totalVisitees * 1.0 / nbJours) : 0.0);
+        kpi.put("derniere_visite",     lastVisit != null ? lastVisit.toString() : null);
+        result.put("kpi", kpi);
+
+        // ── Equipes ───────────────────────────────────────────────────────────
+        result.put("equipes", jdbc.queryForList(
+                "SELECT prog.equipe, " +
+                "  COUNT(prog.num_placette) AS total_affecte, " +
+                "  COALESCE(SUM(CASE WHEN pl.plot_no IS NOT NULL THEN 1 ELSE 0 END), 0) AS total_visite, " +
+                "  COUNT(prog.num_placette) - COALESCE(SUM(CASE WHEN pl.plot_no IS NOT NULL THEN 1 ELSE 0 END), 0) AS restantes, " +
+                "  ROUND(COALESCE(SUM(CASE WHEN pl.plot_no IS NOT NULL THEN 1 ELSE 0 END), 0) * 100.0 / NULLIF(COUNT(prog.num_placette), 0), 1) AS pct_avancement, " +
+                "  COUNT(DISTINCT DATE(pl.date_modified)) AS nb_jours, " +
+                "  ROUND(COALESCE(SUM(CASE WHEN pl.plot_no IS NOT NULL THEN 1 ELSE 0 END), 0) * 1.0 / NULLIF(COUNT(DISTINCT DATE(pl.date_modified)), 0), 1) AS moy_par_jour " +
+                "FROM ifn_programme prog " +
+                "LEFT JOIN plot pl ON pl.plot_no = prog.num_placette AND pl.plot_no NOT LIKE '%C' AND pl.plot_no NOT LIKE '%CS' " +
+                "WHERE prog.equipe IS NOT NULL " +
+                "GROUP BY prog.equipe " +
+                "ORDER BY CAST(REGEXP_REPLACE(prog.equipe, '.*N°(\\d+).*', '\\1') AS INTEGER)"));
+
+        // ── Strates ───────────────────────────────────────────────────────────
+        result.put("strates", jdbc.queryForList(
+                "SELECT prog.strate_cartographique AS strate, " +
+                "  COUNT(prog.num_placette) AS total_programme, " +
+                "  COALESCE(SUM(CASE WHEN pl.plot_no IS NOT NULL THEN 1 ELSE 0 END), 0) AS total_visite, " +
+                "  ROUND(COALESCE(SUM(CASE WHEN pl.plot_no IS NOT NULL THEN 1 ELSE 0 END), 0) * 100.0 / NULLIF(COUNT(prog.num_placette), 0), 1) AS pct_avancement " +
+                "FROM ifn_programme prog " +
+                "LEFT JOIN plot pl ON pl.plot_no = prog.num_placette AND pl.plot_no NOT LIKE '%C' AND pl.plot_no NOT LIKE '%CS' " +
+                "WHERE prog.strate_cartographique IS NOT NULL " +
+                "GROUP BY prog.strate_cartographique " +
+                "ORDER BY total_visite DESC, total_programme DESC"));
+
+        // ── Essences ──────────────────────────────────────────────────────────
+        result.put("essences", jdbc.queryForList(
+                "SELECT COALESCE(pl.strate_terrain_essence, 'Non recensé') AS essence, COUNT(*) AS total_visite " +
+                "FROM ifn_programme prog " +
+                "JOIN plot pl ON pl.plot_no = prog.num_placette AND pl.plot_no NOT LIKE '%C' AND pl.plot_no NOT LIKE '%CS' " +
+                "GROUP BY COALESCE(pl.strate_terrain_essence, 'Non recensé') " +
+                "ORDER BY total_visite DESC"));
+
+        // ── Groupes ───────────────────────────────────────────────────────────
+        result.put("groupes", jdbc.queryForList(
+                "SELECT prog.essence_group AS groupe, " +
+                "  COUNT(prog.num_placette) AS total_programme, " +
+                "  COALESCE(SUM(CASE WHEN pl.plot_no IS NOT NULL THEN 1 ELSE 0 END), 0) AS total_visite, " +
+                "  ROUND(COALESCE(SUM(CASE WHEN pl.plot_no IS NOT NULL THEN 1 ELSE 0 END), 0) * 100.0 / NULLIF(COUNT(prog.num_placette), 0), 1) AS pct_avancement " +
+                "FROM ifn_programme prog " +
+                "LEFT JOIN plot pl ON pl.plot_no = prog.num_placette AND pl.plot_no NOT LIKE '%C' AND pl.plot_no NOT LIKE '%CS' " +
+                "WHERE prog.essence_group IS NOT NULL " +
+                "GROUP BY prog.essence_group " +
+                "ORDER BY total_visite DESC, total_programme DESC"));
+
+        // ── Strates par équipe ────────────────────────────────────────────────
+        result.put("stratesParEquipe", jdbc.queryForList(
+                "SELECT prog.equipe, " +
+                "  COALESCE(pl.strate_terrain_essence, 'Non recensé') AS essence, " +
+                "  COUNT(pl.plot_no) AS nb_visite " +
+                "FROM ifn_programme prog " +
+                "JOIN plot pl ON pl.plot_no = prog.num_placette AND pl.plot_no NOT LIKE '%C' AND pl.plot_no NOT LIKE '%CS' " +
+                "WHERE prog.equipe IS NOT NULL " +
+                "GROUP BY prog.equipe, COALESCE(pl.strate_terrain_essence, 'Non recensé') " +
+                "ORDER BY CAST(REGEXP_REPLACE(prog.equipe, '.*N°(\\d+).*', '\\1') AS INTEGER), nb_visite DESC"));
+
+        // ── Accessibilité ─────────────────────────────────────────────────────
+        Map<String, Object> rawAcc = jdbc.queryForMap(
+                "SELECT COUNT(*) AS total_visitees, " +
+                "  SUM(CASE WHEN plot_accessibilite        = 1 THEN 1 ELSE 0 END) AS nb_accessible, " +
+                "  SUM(CASE WHEN plot_accessibilite        = 0 THEN 1 ELSE 0 END) AS nb_inaccessible, " +
+                "  SUM(CASE WHEN plot_accessibility_a_pied = 0 THEN 1 ELSE 0 END) AS nb_a_pied_0, " +
+                "  SUM(CASE WHEN plot_accessibility_a_pied = 1 THEN 1 ELSE 0 END) AS nb_a_pied_1, " +
+                "  SUM(CASE WHEN plot_accessibility_a_pied = 2 THEN 1 ELSE 0 END) AS nb_a_pied_2 " +
+                "FROM plot WHERE plot_no NOT LIKE '%C' AND plot_no NOT LIKE '%CS'");
+        long accTotal      = ((Number) rawAcc.get("total_visitees")).longValue();
+        long accAccessible = ((Number) rawAcc.get("nb_accessible")).longValue();
+        Map<String, Object> globalAcc = new LinkedHashMap<>(rawAcc);
+        globalAcc.put("pct_accessible", accTotal > 0 ? (accAccessible * 100.0 / accTotal) : 0.0);
+
+        List<Map<String, Object>> equipesAcc = jdbc.queryForList(
+                "SELECT prog.equipe, COUNT(*) AS total_visite, " +
+                "  SUM(CASE WHEN pl.plot_accessibilite        = 1 THEN 1 ELSE 0 END) AS nb_accessible, " +
+                "  SUM(CASE WHEN pl.plot_accessibilite        = 0 THEN 1 ELSE 0 END) AS nb_inaccessible, " +
+                "  SUM(CASE WHEN pl.plot_accessibility_a_pied = 0 THEN 1 ELSE 0 END) AS nb_a_pied_0, " +
+                "  SUM(CASE WHEN pl.plot_accessibility_a_pied = 1 THEN 1 ELSE 0 END) AS nb_a_pied_1, " +
+                "  SUM(CASE WHEN pl.plot_accessibility_a_pied = 2 THEN 1 ELSE 0 END) AS nb_a_pied_2, " +
+                "  ROUND(SUM(CASE WHEN pl.plot_accessibilite = 1 THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 1) AS pct_accessible " +
+                "FROM ifn_programme prog " +
+                "JOIN plot pl ON pl.plot_no = prog.num_placette " +
+                "WHERE pl.plot_no NOT LIKE '%C' AND pl.plot_no NOT LIKE '%CS' " +
+                "GROUP BY prog.equipe " +
+                "ORDER BY CAST(REGEXP_REPLACE(prog.equipe, '.*N°(\\d+).*', '\\1') AS INTEGER)");
+
+        Map<String, Object> accessibilite = new LinkedHashMap<>();
+        accessibilite.put("global",  globalAcc);
+        accessibilite.put("equipes", equipesAcc);
+        result.put("accessibilite", accessibilite);
+
+        // ── Temporel ──────────────────────────────────────────────────────────
+        Map<String, Object> temporel = new LinkedHashMap<>();
+        temporel.put("visitesParJour",   jdbc.queryForList("SELECT * FROM v_visites_par_jour ORDER BY date_visite"));
+        temporel.put("moyParJourEquipe", jdbc.queryForList("SELECT * FROM v_moy_jour_equipe ORDER BY date_visite, equipe"));
+        temporel.put("productivite", jdbc.queryForList(
+                "SELECT prog.equipe, COUNT(prog.num_placette) AS total_affecte, " +
+                "  COUNT(pl.plot_no) AS total_visite, " +
+                "  COUNT(DISTINCT DATE(pl.date_modified)) AS nb_jours, " +
+                "  ROUND(COUNT(pl.plot_no) * 1.0 / NULLIF(COUNT(DISTINCT DATE(pl.date_modified)), 0), 1) AS moy_par_jour, " +
+                "  CEIL((COUNT(prog.num_placette) - COUNT(pl.plot_no)) * 1.0 / " +
+                "       NULLIF(ROUND(COUNT(pl.plot_no) * 1.0 / NULLIF(COUNT(DISTINCT DATE(pl.date_modified)), 0), 1), 0)) AS jours_restants_estimes " +
+                "FROM ifn_programme prog " +
+                "LEFT JOIN plot pl ON pl.plot_no = prog.num_placette AND pl.plot_no NOT LIKE '%C' AND pl.plot_no NOT LIKE '%CS' " +
+                "WHERE prog.equipe IS NOT NULL " +
+                "GROUP BY prog.equipe " +
+                "ORDER BY CAST(REGEXP_REPLACE(prog.equipe, '.*N°(\\d+).*', '\\1') AS INTEGER)"));
+        temporel.put("sreaParJour", jdbc.queryForList(
+                "SELECT DATE(date_modified) AS date_visite, COUNT(*) AS nb_visite " +
+                "FROM plot WHERE plot_no LIKE '%C' AND plot_no NOT LIKE '%CS' " +
+                "GROUP BY DATE(date_modified) ORDER BY date_visite"));
+        result.put("temporel", temporel);
+
+        // ── Contrôle par équipe ───────────────────────────────────────────────
+        result.put("controleParEquipe",        jdbc.queryForList("SELECT equipe, nb_controle FROM v_controle_par_equipe"));
+        result.put("controleServiceParEquipe", jdbc.queryForList("SELECT equipe, nb_controle_service FROM v_controle_service_par_equipe"));
+
+        return ResponseEntity.ok(result);
     }
 }

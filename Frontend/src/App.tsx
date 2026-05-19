@@ -5,9 +5,11 @@ import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import { Sidebar } from './components/layout/Sidebar';
 import { MapView } from './components/map/MapView';
 import { Dashboard } from './components/dashboard/Dashboard';
+import { Login } from './components/dashboard/Login';
 import { useAppStore } from './stores/useAppStore';
 import { useDataStore } from './stores/useDataStore';
 import { initOfflineRouter } from './services/offlineRouter';
+import { getToken, clearAuth } from './services/dashboardApi';
 
 const MAP_PASSWORD = 'ifn_2026';
 
@@ -172,11 +174,21 @@ function ProtectedMap() {
   return unlocked ? <MapApp /> : <MapLogin onUnlock={unlock} />;
 }
 
+function ProtectedDashboard() {
+  const [token, setToken] = useState<string | null>(() => getToken());
+
+  const handleLogin = (t: string) => setToken(t);
+  const handleLogout = () => { clearAuth(); setToken(null); };
+
+  if (!token) return <Login onLogin={handleLogin} />;
+  return <Dashboard onLogout={handleLogout} />;
+}
+
 export default function App() {
   return (
     <Routes>
       <Route path="/" element={<ProtectedMap />} />
-      <Route path="/dashboard" element={<Dashboard onClose={() => {}} />} />
+      <Route path="/dashboard" element={<ProtectedDashboard />} />
     </Routes>
   );
 }

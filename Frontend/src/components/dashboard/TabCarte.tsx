@@ -51,10 +51,10 @@ function equipeShort(name: string): string {
 // ─── DivIcon factories ────────────────────────────────────────────────────────
 
 function zoomToDotSize(zoom: number): number {
-  if (zoom >= 15) return 14;
-  if (zoom >= 13) return 12;
-  if (zoom >= 11) return 10;
-  if (zoom >= 9)  return 8;
+  if (zoom >= 15) return 13;
+  if (zoom >= 13) return 11;
+  if (zoom >= 11) return 9;
+  if (zoom >= 9)  return 7;
   return 6;
 }
 
@@ -204,7 +204,7 @@ export function TabCarte({ data }: Props) {
   const [loading, setLoading]         = useState(true);
   const [error, setError]             = useState<string | null>(null);
 
-  const [classifyMode, setClassifyMode] = useState<ClassifyMode>('controle');
+  const [classifyMode, setClassifyMode] = useState<ClassifyMode>('statut');
   const [selEquipes,   setSelEquipes]   = useState<Set<string>>(new Set());
   const [selEssences,  setSelEssences]  = useState<Set<string>>(new Set());
   const [selStatuts,   setSelStatuts]   = useState<Set<string>>(new Set());
@@ -614,9 +614,20 @@ export function TabCarte({ data }: Props) {
           {openPanel === 'controle' && (() => {
             const cntControle = (data.kpi.nb_controle ?? 0) + (data.kpi.nb_controle_service ?? 0);
             const cntVisitee  = data.kpi.total_visitees - cntControle;
+            const cntRealisee = data.kpi.total_visitees;
             const cntProg     = data.kpi.restantes ?? (data.kpi.total_programme - data.kpi.total_visitees);
+            const realiseeChecked = selControle.has('controle') && selControle.has('visitee');
+            const realiseeIndeterminate = !realiseeChecked && (selControle.has('controle') || selControle.has('visitee'));
+            const toggleRealisee = () => {
+              setSelControle(prev => {
+                const n = new Set(prev);
+                if (realiseeChecked || realiseeIndeterminate) { n.delete('controle'); n.delete('visitee'); }
+                else { n.add('controle'); n.add('visitee'); }
+                return n;
+              });
+            };
             return (
-              <DropPanel style={{ minWidth: 220 }}>
+              <DropPanel style={{ minWidth: 230 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                   <p style={{ ...SECTION_LABEL, marginBottom: 0 }}>Filtrer par contrôle</p>
                   <button style={miniBtn} onClick={() => setSelControle(selControle.size > 0 ? new Set() : new Set(['controle', 'visitee', 'programmee']))}>
@@ -624,31 +635,46 @@ export function TabCarte({ data }: Props) {
                   </button>
                 </div>
 
-                {/* ── Contrôlées ── */}
+                {/* ── Réalisées (parent) ── */}
                 <label style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0', cursor: 'pointer' }}>
+                  <Checkbox
+                    size="small"
+                    checked={realiseeChecked}
+                    indeterminate={realiseeIndeterminate}
+                    onChange={toggleRealisee}
+                    sx={{ p: 0.3, color: '#cbd5e1', '&.Mui-checked': { color: '#34d399' }, '&.MuiCheckbox-indeterminate': { color: '#34d399' } }}
+                  />
+                  <span style={{ fontSize: 12, fontWeight: 700, color: '#dde4ec', flex: 1 }}>Placettes contrôlées et réalisées</span>
+                  <span style={{ fontSize: 10, fontFamily: 'monospace', color: cntRealisee > 0 ? '#7a8a9c' : '#cbd5e1' }}>{cntRealisee}</span>
+                </label>
+
+                {/* ── Sub: Contrôlées ── */}
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 0 3px 20px', cursor: 'pointer' }}>
                   <Checkbox
                     size="small"
                     checked={selControle.has('controle')}
                     onChange={() => setSelControle(prev => { const n = new Set(prev); if (n.has('controle')) n.delete('controle'); else n.add('controle'); return n; })}
                     sx={{ p: 0.3, color: '#cbd5e1', '&.Mui-checked': { color: '#d946ef' } }}
                   />
-                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#d946ef', display: 'inline-block', flexShrink: 0 }} />
-                  <span style={{ fontSize: 12, fontWeight: 600, color: '#dde4ec', flex: 1 }}>Placettes contrôlées</span>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#d946ef', display: 'inline-block', flexShrink: 0 }} />
+                  <span style={{ fontSize: 11, color: '#bac4d0', flex: 1 }}>Placettes contrôlées</span>
                   <span style={{ fontSize: 10, fontFamily: 'monospace', color: cntControle > 0 ? '#7a8a9c' : '#cbd5e1' }}>{cntControle}</span>
                 </label>
 
-                {/* ── Non contrôlées ── */}
-                <label style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0', cursor: 'pointer' }}>
+                {/* ── Sub: Non contrôlées ── */}
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 0 3px 20px', cursor: 'pointer' }}>
                   <Checkbox
                     size="small"
                     checked={selControle.has('visitee')}
                     onChange={() => setSelControle(prev => { const n = new Set(prev); if (n.has('visitee')) n.delete('visitee'); else n.add('visitee'); return n; })}
                     sx={{ p: 0.3, color: '#cbd5e1', '&.Mui-checked': { color: '#34d399' } }}
                   />
-                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#34d399', display: 'inline-block', flexShrink: 0 }} />
-                  <span style={{ fontSize: 12, fontWeight: 600, color: '#dde4ec', flex: 1 }}>Placettes non contrôlées</span>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#34d399', display: 'inline-block', flexShrink: 0 }} />
+                  <span style={{ fontSize: 11, color: '#bac4d0', flex: 1 }}>Placettes réalisées</span>
                   <span style={{ fontSize: 10, fontFamily: 'monospace', color: cntVisitee > 0 ? '#7a8a9c' : '#cbd5e1' }}>{cntVisitee}</span>
                 </label>
+
+                <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', margin: '6px 0' }} />
 
                 {/* ── En cours ── */}
                 <label style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0', cursor: 'pointer' }}>
@@ -659,7 +685,7 @@ export function TabCarte({ data }: Props) {
                     sx={{ p: 0.3, color: '#cbd5e1', '&.Mui-checked': { color: '#fb923c' } }}
                   />
                   <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#fb923c', display: 'inline-block', flexShrink: 0 }} />
-                  <span style={{ fontSize: 12, fontWeight: 600, color: '#dde4ec', flex: 1 }}>Placettes en cours</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: '#dde4ec', flex: 1 }}>En cours</span>
                   <span style={{ fontSize: 10, fontFamily: 'monospace', color: cntProg > 0 ? '#7a8a9c' : '#cbd5e1' }}>{cntProg}</span>
                 </label>
               </DropPanel>
@@ -802,7 +828,7 @@ export function TabCarte({ data }: Props) {
                   <>
                     {[
                       { color: '#d946ef', label: 'Placettes contrôlées' },
-                      { color: '#34d399', label: 'Placettes non contrôlées' },
+                      { color: '#34d399', label: 'Placettes réalisées' },
                       { color: '#fb923c', label: 'Placettes en cours' },
                     ].map(({ color, label }) => (
                       <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 5 }}>
