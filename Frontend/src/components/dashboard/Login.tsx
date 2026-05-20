@@ -80,11 +80,8 @@ export function Login({ onLogin }: Props) {
           <ForestIcon style={{ fontSize: 32, color: '#fff' }} />
         </div>
 
-        <div style={{ color: '#f1f5f9', fontSize: 22, fontWeight: 700, letterSpacing: '-0.3px', marginBottom: 4 }}>
-          Géo Navigateur Forestier
-        </div>
-        <div style={{ color: '#475569', fontSize: 13, marginBottom: 36 }}>
-          Inventaire Forestier National 2026
+        <div style={{ color: '#f1f5f9', fontSize: 22, fontWeight: 700, letterSpacing: '-0.3px', marginBottom: 36 }}>
+          Tableau de bord IFN
         </div>
 
         {/* Username */}

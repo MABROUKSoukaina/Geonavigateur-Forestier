@@ -32,6 +32,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers("/api/dashboard/events").permitAll()
+                .requestMatchers("/api/dashboard/notify").permitAll()     // sync script, secured by secret header
                 .requestMatchers("/api/dashboard/**").authenticated()     // only dashboard needs JWT
                 .anyRequest().permitAll()
             )

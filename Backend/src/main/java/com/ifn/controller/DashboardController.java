@@ -1,9 +1,12 @@
 package com.ifn.controller;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -32,12 +35,29 @@ public class DashboardController {
     private final JdbcTemplate jdbc;
     private final RefreshNotifier refreshNotifier;
 
+    @Value("${app.sync.secret}")
+    private String syncSecret;
+
     /**
      * SSE stream — browsers subscribe here to receive "refresh" events.
      */
     @GetMapping(value = "/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter subscribe() {
         return refreshNotifier.subscribe();
+    }
+
+    /**
+     * POST /api/dashboard/notify
+     * Called by the Python sync script after a successful upsert.
+     * Fires an SSE refresh event to all connected browsers.
+     */
+    @PostMapping("/notify")
+    public ResponseEntity<Void> notify(
+        @RequestHeader(value = "X-Sync-Secret", required = false) String secret
+    ) {
+        if (!syncSecret.equals(secret)) return ResponseEntity.status(403).build();
+        refreshNotifier.notifyRefresh();
+        return ResponseEntity.ok().build();
     }
 
     /**

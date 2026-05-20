@@ -482,7 +482,7 @@ function TabEquipe({ data }: { data: DashboardData }) {
             <span style={{ fontSize: 10, color: '#93c5fd' }}>moyenne globale / jour</span>
           </div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 10 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
           {productivite.map((eq: ProductiviteEquipe) => {
             const color = equipeColor(eq.equipe);
             return (
