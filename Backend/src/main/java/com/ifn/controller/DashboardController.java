@@ -102,7 +102,11 @@ public class DashboardController {
         // v_kpi_global already excludes control plots from total_visitees
         long totalVisitees = ((Number) kpi.get("total_visitees")).longValue();
         long totalProgramme = ((Number) kpi.get("total_programme")).longValue();
-        long nbJours = ((Number) kpi.getOrDefault("nb_jours_terrain", 1L)).longValue();
+        // Count distinct working days directly — same logic as v_visites_par_jour
+        Long nbJoursRaw = jdbc.queryForObject(
+                "SELECT COUNT(DISTINCT DATE(date_modified)) FROM plot WHERE plot_no NOT LIKE '%C' AND plot_no NOT LIKE '%CS'",
+                Long.class);
+        long nbJours = nbJoursRaw != null ? nbJoursRaw : 1L;
 
         // Last realized plot date
         java.time.LocalDate lastVisit = jdbc.queryForObject(
@@ -114,6 +118,7 @@ public class DashboardController {
         kpi.put("total_visitees",      totalVisitees);
         kpi.put("restantes",           totalProgramme - totalVisitees);
         kpi.put("pct_avancement",      totalProgramme > 0 ? (totalVisitees * 100.0 / totalProgramme) : 0.0);
+        kpi.put("nb_jours_terrain",    nbJours);
         kpi.put("moy_par_jour",        nbJours > 0 ? (totalVisitees * 1.0 / nbJours) : 0.0);
         kpi.put("derniere_visite",     lastVisit != null ? lastVisit.toString() : null);
 
@@ -415,7 +420,10 @@ public class DashboardController {
         long ctrlCS = nbControleService != null ? nbControleService : 0L;
         long totalVisitees  = kpi.isEmpty() ? 0L : ((Number) kpi.get("total_visitees")).longValue();
         long totalProgramme = kpi.isEmpty() ? 0L : ((Number) kpi.get("total_programme")).longValue();
-        long nbJours        = kpi.isEmpty() ? 1L : ((Number) kpi.getOrDefault("nb_jours_terrain", 1L)).longValue();
+        Long nbJoursRaw2 = jdbc.queryForObject(
+                "SELECT COUNT(DISTINCT DATE(date_modified)) FROM plot WHERE plot_no NOT LIKE '%C' AND plot_no NOT LIKE '%CS'",
+                Long.class);
+        long nbJours = nbJoursRaw2 != null ? nbJoursRaw2 : 1L;
         java.time.LocalDate lastVisit = jdbc.queryForObject(
                 "SELECT MAX(DATE(date_modified)) FROM plot WHERE plot_no NOT LIKE '%C' AND plot_no NOT LIKE '%CS'",
                 java.time.LocalDate.class);
@@ -424,6 +432,7 @@ public class DashboardController {
         kpi.put("total_visitees",      totalVisitees);
         kpi.put("restantes",           totalProgramme - totalVisitees);
         kpi.put("pct_avancement",      totalProgramme > 0 ? (totalVisitees * 100.0 / totalProgramme) : 0.0);
+        kpi.put("nb_jours_terrain",    nbJours);
         kpi.put("moy_par_jour",        nbJours > 0 ? (totalVisitees * 1.0 / nbJours) : 0.0);
         kpi.put("derniere_visite",     lastVisit != null ? lastVisit.toString() : null);
         result.put("kpi", kpi);

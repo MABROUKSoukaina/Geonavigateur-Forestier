@@ -77,6 +77,18 @@ const S = {
   },
 };
 
+// ─── Responsive hook ─────────────────────────────────────────────────────────
+
+function useWindowWidth() {
+  const [w, setW] = useState(() => window.innerWidth);
+  useEffect(() => {
+    const h = () => setW(window.innerWidth);
+    window.addEventListener('resize', h);
+    return () => window.removeEventListener('resize', h);
+  }, []);
+  return w;
+}
+
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function ProgressRing({ pct, size = 80, stroke = 6, color = '#86efac' }: {
@@ -346,12 +358,13 @@ function EssenceDonutChart({ essences }: { essences: AvancementEssence[] }) {
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 function TabGlobal({ data }: { data: DashboardData }) {
+  const w = useWindowWidth();
   const { kpi, essences } = data;
   const pct = Number(kpi.pct_avancement);
   const topEssences = essences.slice(0, 4);
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: w < 1100 ? '1fr' : '1fr 1fr', gap: 20 }}>
       <Card title="Avancement global">
         <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
           <div style={{ position: 'relative', flexShrink: 0 }}>
@@ -386,6 +399,7 @@ function TabGlobal({ data }: { data: DashboardData }) {
 }
 
 function TabEquipe({ data }: { data: DashboardData }) {
+  const w = useWindowWidth();
   const equipes = sortByNum(data.equipes);
   const totalProgramme = data.kpi.total_programme;
   const productivite = sortByNum(data.temporel.productivite);
@@ -401,7 +415,7 @@ function TabEquipe({ data }: { data: DashboardData }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: w < 700 ? '1fr' : w < 1100 ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)', gap: 16 }}>
         {equipes.map((eq: AvancementEquipe) => {
           const color = equipeColor(eq.equipe);
           const pct = Number(eq.pct_avancement);
@@ -482,7 +496,7 @@ function TabEquipe({ data }: { data: DashboardData }) {
             <span style={{ fontSize: 10, color: '#93c5fd' }}>moyenne globale / jour</span>
           </div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: w < 700 ? '1fr' : w < 1100 ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)', gap: 10 }}>
           {productivite.map((eq: ProductiviteEquipe) => {
             const color = equipeColor(eq.equipe);
             return (
@@ -860,7 +874,7 @@ function DailyBarChart({ days }: { days: { date_visite: string; nb_placettes: nu
       {/* Scroll hint — only shown when chart overflows */}
       {days.length > 20 && (
         <p style={{ fontSize: 10, color: '#94a3b8', textAlign: 'right', marginTop: 4 }}>
-          ← défiler pour voir tous les jours ({days.length} jours)
+          ← défiler pour voir tous les jours
         </p>
       )}
     </div>
@@ -1729,6 +1743,7 @@ export function Dashboard({ onLogout }: Props) {
   const [importMsg, setImportMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [confirmLogout, setConfirmLogout] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const w = useWindowWidth();
 
   const load = async () => {
     setLoading(true); setError(null);
@@ -1765,27 +1780,29 @@ export function Dashboard({ onLogout }: Props) {
   return (
     <div style={S.overlay} data-dashboard>
       {/* Header */}
-      <div style={S.header}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+      <div style={{ ...S.header, padding: w < 768 ? '12px 16px' : '20px 32px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: w < 768 ? 10 : 16, minWidth: 0 }}>
           {/* ANEF Logo */}
           <img
             src="/anef-logo.png"
             alt="ANEF"
-            style={{ height: 52, width: 'auto', objectFit: 'contain', flexShrink: 0 }}
+            style={{ height: w < 768 ? 36 : 52, width: 'auto', objectFit: 'contain', flexShrink: 0 }}
           />
           {/* Divider */}
           <div style={{ width: 1, height: 40, background: 'rgba(255,255,255,0.12)', flexShrink: 0 }} />
           {/* Title */}
-          <div>
-            <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-0.02em', color: '#edf1f5' }}>
+          <div style={{ minWidth: 0 }}>
+            <h1 style={{ fontSize: w < 768 ? 16 : w < 1100 ? 20 : 24, fontWeight: 700, letterSpacing: '-0.02em', color: '#edf1f5', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               Inventaire Forestier National 2026
             </h1>
-            {data && (
-              <p style={{ color: '#bac4d0', fontSize: 14, marginTop: 3, fontWeight: 600 }}>
+            {data && w >= 600 && (
+              <p style={{ color: '#bac4d0', fontSize: w < 1100 ? 12 : 14, marginTop: 3, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 DRANEF Rabat-Salé-Kénitra · {data.kpi.total_programme} placettes programmées
-                <span style={{ marginLeft: 8, fontSize: 12, color: '#94a3b8', fontWeight: 500 }}>
+                {w >= 900 && (
+                  <span style={{ marginLeft: 8, fontSize: 12, color: '#94a3b8', fontWeight: 500 }}>
                     · Dernière mise à jour : <strong>{data.kpi.derniere_visite ? new Date(data.kpi.derniere_visite).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' }) : '—'}</strong>
                   </span>
+                )}
               </p>
             )}
           </div>
@@ -1908,7 +1925,7 @@ export function Dashboard({ onLogout }: Props) {
 
       {/* KPI strip skeleton */}
       {loading && !data && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 10, padding: '4px 32px 12px', flexShrink: 0 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: w < 768 ? 'repeat(2,1fr)' : w < 1200 ? 'repeat(3,1fr)' : 'repeat(6,1fr)', gap: 10, padding: w < 768 ? '4px 16px 12px' : '4px 32px 12px', flexShrink: 0 }}>
           <style>{`@keyframes ifn-shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}`}</style>
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} style={{ ...S.card, padding: '20px 16px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
@@ -1921,7 +1938,7 @@ export function Dashboard({ onLogout }: Props) {
 
       {/* KPI strip */}
       {data && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 10, padding: '4px 32px 12px', flexShrink: 0 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: w < 768 ? 'repeat(2,1fr)' : w < 1200 ? 'repeat(3,1fr)' : 'repeat(6,1fr)', gap: 10, padding: w < 768 ? '4px 16px 12px' : '4px 32px 12px', flexShrink: 0 }}>
           {(() => {
             const prod = data.temporel.productivite.filter((e: ProductiviteEquipe) => Number(e.moy_par_jour) > 0);
             const moyParEquipe = prod.length > 0
@@ -1949,20 +1966,20 @@ export function Dashboard({ onLogout }: Props) {
       )}
 
       {/* Two-column content area */}
-      <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: w < 1200 ? 'column' : 'row', minHeight: 0, overflow: w < 1200 ? 'auto' : 'hidden' }}>
 
         {/* LEFT — tabs + panel content */}
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', borderRight: '1px solid rgba(255,255,255,0.08)' }}>
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', borderRight: w < 1200 ? 'none' : '1px solid rgba(255,255,255,0.08)', borderBottom: w < 1200 ? '1px solid rgba(255,255,255,0.08)' : 'none' }}>
 
           {/* Tab bar */}
-          <div style={{ display: 'flex', gap: 2, padding: '12px 24px 0', borderBottom: '1px solid rgba(255,255,255,0.08)', flexShrink: 0 }}>
+          <div style={{ display: 'flex', gap: 2, padding: w < 768 ? '8px 12px 0' : '12px 24px 0', borderBottom: '1px solid rgba(255,255,255,0.08)', flexShrink: 0, overflowX: 'auto', scrollbarWidth: 'none' }}>
             {TABS.map(({ id, label }) => (
               <button key={id} onClick={() => setTab(id)}
                 style={{
                   background: tab === id ? 'rgba(5,150,105,0.07)' : 'transparent',
                   border: 'none', borderBottom: `2px solid ${tab === id ? '#10b981' : 'transparent'}`,
                   color: tab === id ? '#10b981' : '#bac4d0',
-                  cursor: 'pointer', padding: '10px 14px', fontSize: 13, fontWeight: 700, flex: 1, textAlign: 'center' as const, whiteSpace: 'nowrap' as const,
+                  cursor: 'pointer', padding: w < 768 ? '8px 10px' : '10px 14px', fontSize: w < 768 ? 12 : 13, fontWeight: 700, flex: 1, textAlign: 'center' as const, whiteSpace: 'nowrap' as const,
                   transition: 'all 0.2s', marginBottom: -1,
                 }}>
                 {label}
@@ -1971,7 +1988,7 @@ export function Dashboard({ onLogout }: Props) {
           </div>
 
           {/* Panel content */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
+          <div style={{ flex: w < 1200 ? 'none' : 1, overflowY: w < 1200 ? 'visible' : 'auto', padding: w < 768 ? '16px 12px' : '20px 24px' }}>
             {loading && !data && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 {/* Two large skeleton cards + one row of smaller ones */}
@@ -2003,7 +2020,7 @@ export function Dashboard({ onLogout }: Props) {
         </div>
 
         {/* RIGHT — permanent map panel */}
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0, padding: 12 }}>
+        <div style={{ flex: w < 1200 ? 'none' : 1, height: w < 1200 ? '50vh' : undefined, minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0, padding: 12 }}>
           {data
             ? <TabCarte data={data} />
             : <div style={{
