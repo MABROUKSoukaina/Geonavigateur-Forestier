@@ -1110,7 +1110,7 @@ function TabTemporel({ data }: { data: DashboardData }) {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                   <div style={{ width: 8, height: 8, borderRadius: '50%', background: sreaColor, flexShrink: 0 }} />
-                  <span style={{ fontSize: 13, fontWeight: 600, color: '#edf1f5' }}>Équipe SREA</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#edf1f5' }}>Équipes de contrôle</span>
                 </div>
                 <span style={{ fontSize: 11, color: '#94a3b8', fontFamily: 'monospace' }}>
                   {total} contrôlée{total > 1 ? 's' : ''}
@@ -1193,7 +1193,7 @@ function TabTemporel({ data }: { data: DashboardData }) {
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px 10px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <div style={{ width: 10, height: 10, borderRadius: '50%', background: sreaColor }} />
-                        <span style={{ fontSize: 14, fontWeight: 600, color: '#edf1f5' }}>Équipe SREA</span>
+                        <span style={{ fontSize: 14, fontWeight: 600, color: '#edf1f5' }}>Équipes de contrôle</span>
                       </div>
                       <span style={{ fontSize: 12, color: '#94a3b8', fontFamily: 'monospace' }}>
                         {total} contrôlée{total > 1 ? 's' : ''}
