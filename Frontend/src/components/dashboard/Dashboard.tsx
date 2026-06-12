@@ -407,8 +407,8 @@ function TabEquipe({ data }: { data: DashboardData }) {
     ? productivite.reduce((s: number, eq: ProductiviteEquipe) => s + Number(eq.moy_par_jour || 0), 0) / productivite.length
     : 0;
 
-  const sreaTotal    = 108;
-  const sreaRealise  = (data.kpi.nb_controle ?? 0);
+  const sreaTotal    = 260;
+  const sreaRealise  = (data.kpi.nb_controle ?? 0) + (data.kpi.nb_controle_service ?? 0);
   const sreaRestant  = Math.max(sreaTotal - sreaRealise, 0);
   const sreaPct      = sreaTotal > 0 ? (sreaRealise / sreaTotal) * 100 : 0;
   const sreaColor    = '#d946ef';
@@ -458,8 +458,7 @@ function TabEquipe({ data }: { data: DashboardData }) {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <div>
-              <p style={{ fontSize: 11, color: '#94a3b8', marginBottom: 4 }}>Équipe de contrôle</p>
-              <p style={{ fontSize: 14, fontWeight: 600, color: sreaColor }}>Équipe SREA</p>
+              <p style={{ fontSize: 14, fontWeight: 600, color: sreaColor }}>Équipes de contrôle</p>
             </div>
             <div style={{ position: 'relative', flexShrink: 0 }}>
               <ProgressRing pct={sreaPct} size={56} stroke={5} color={sreaColor} />
@@ -529,7 +528,7 @@ function TabEquipe({ data }: { data: DashboardData }) {
               <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: sreaColor }} />
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <div style={{ width: 8, height: 8, borderRadius: '50%', background: sreaColor, flexShrink: 0 }} />
-                <p style={{ fontSize: 13, fontWeight: 600, color: sreaColor }}>Équipe SREA</p>
+                <p style={{ fontSize: 13, fontWeight: 600, color: sreaColor }}>Équipes de contrôle</p>
               </div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
                 <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 24, color: sreaColor }}>{sreaMoy.toFixed(1)}</span>

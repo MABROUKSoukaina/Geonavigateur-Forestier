@@ -546,7 +546,7 @@ public class DashboardController {
                 "ORDER BY CAST(REGEXP_REPLACE(prog.equipe, '.*N°(\\d+).*', '\\1') AS INTEGER)"));
         temporel.put("sreaParJour", jdbc.queryForList(
                 "SELECT DATE(date_modified) AS date_visite, COUNT(*) AS nb_visite " +
-                "FROM plot WHERE plot_no LIKE '%C' AND plot_no NOT LIKE '%CS' " +
+                "FROM plot WHERE (plot_no LIKE '%C' OR plot_no LIKE '%CS') " +
                 "GROUP BY DATE(date_modified) ORDER BY date_visite"));
         result.put("temporel", temporel);
 
