@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import type {
   DashboardData, AvancementEquipe, AvancementEssence, AccessibiliteEquipe, ProductiviteEquipe, StrateParEquipe, MoyJourEquipe,
 } from '../../services/dashboardApi';
-import { fetchDashboardData, importPlotsCsv } from '../../services/dashboardApi';
+import { fetchDashboardData, importZip } from '../../services/dashboardApi';
 import { TabCarte } from './TabCarte';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -1758,14 +1758,21 @@ export function Dashboard({ onLogout }: Props) {
     setImporting(true);
     setImportMsg(null);
     try {
-      const res = await importPlotsCsv(file);
-      setImportMsg({ text: `Import réussi : ${res.inserted} ajoutées, ${res.updated} mises à jour`, ok: true });
+      const res = await importZip(file);
+      const errors = Object.entries(res).filter(([k]) => k.endsWith('_error'));
+      if (errors.length > 0) {
+        setImportMsg({ text: `Import partiel — erreurs : ${errors.map(([k, v]) => `${k}: ${v}`).join(', ')}`, ok: false });
+      } else {
+        const total = Object.values(res).reduce<number>((s, v) => s + (typeof v === 'number' ? v : 0), 0);
+        const tables = Object.keys(res).length;
+        setImportMsg({ text: `Import réussi : ${total} lignes dans ${tables} table${tables > 1 ? 's' : ''}`, ok: true });
+      }
       load();
     } catch (err) {
       setImportMsg({ text: err instanceof Error ? err.message : 'Erreur import', ok: false });
     } finally {
       setImporting(false);
-      setTimeout(() => setImportMsg(null), 6000);
+      setTimeout(() => setImportMsg(null), 8000);
     }
   };
 
@@ -1824,14 +1831,14 @@ export function Dashboard({ onLogout }: Props) {
               <input
                 ref={fileRef}
                 type="file"
-                accept=".csv"
+                accept=".zip"
                 style={{ display: 'none' }}
                 onChange={handleImport}
               />
               <button
                 onClick={() => fileRef.current?.click()}
                 disabled={importing}
-                title={importing ? 'Importation en cours…' : 'Importer des placettes (CSV)'}
+                title={importing ? 'Importation en cours…' : 'Importer toutes les tables (ZIP Collect)'}
                 style={{ ...S.iconBtn, color: importing ? '#10b981' : '#94a3b8' }}
               >
                 {importing ? (

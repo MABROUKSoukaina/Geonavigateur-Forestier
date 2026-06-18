@@ -238,12 +238,22 @@ export async function fetchDashboardData(): Promise<DashboardData> {
   return get<DashboardData>('/all');
 }
 
-// ─── Plot CSV import ───────────────────────────────────────────────────────────
+// ─── Plot CSV import (legacy — single CSV) ────────────────────────────────────
 
 export async function importPlotsCsv(file: File): Promise<{ inserted: number; updated: number }> {
   const form = new FormData();
   form.append('file', file);
   const res = await fetch(`${BACKEND}/api/plots/import`, { method: 'POST', headers: authHeaders(), body: form });
   if (!res.ok) throw new Error(`Import failed: ${res.status}`);
+  return res.json();
+}
+
+// ─── ZIP import (all tables) ──────────────────────────────────────────────────
+
+export async function importZip(file: File): Promise<Record<string, number | string>> {
+  const form = new FormData();
+  form.append('file', file);
+  const res = await fetch(`${BACKEND}/api/import/zip`, { method: 'POST', headers: authHeaders(), body: form });
+  if (!res.ok) throw new Error(`Import ZIP échoué : ${res.status}`);
   return res.json();
 }
