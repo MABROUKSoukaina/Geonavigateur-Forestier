@@ -1763,9 +1763,15 @@ export function Dashboard({ onLogout }: Props) {
       if (errors.length > 0) {
         setImportMsg({ text: `Import partiel — erreurs : ${errors.map(([k, v]) => `${k}: ${v}`).join(', ')}`, ok: false });
       } else {
-        const total = Object.values(res).reduce<number>((s, v) => s + (typeof v === 'number' ? v : 0), 0);
-        const tables = Object.keys(res).length;
-        setImportMsg({ text: `Import réussi : ${total} lignes dans ${tables} table${tables > 1 ? 's' : ''}`, ok: true });
+        const plot = res['plot'] as { inserted: number; updated: number } | undefined;
+        const plotMsg = plot
+          ? `${plot.inserted} placette${plot.inserted !== 1 ? 's' : ''} ajoutée${plot.inserted !== 1 ? 's' : ''}, ${plot.updated} mise${plot.updated !== 1 ? 's' : ''} à jour`
+          : '';
+        const detailTotal = Object.entries(res)
+          .filter(([k]) => k !== 'plot')
+          .reduce<number>((s, [, v]) => s + (typeof v === 'number' ? v : 0), 0);
+        const parts = [plotMsg, detailTotal > 0 ? `${detailTotal} lignes de détail importées` : ''].filter(Boolean);
+        setImportMsg({ text: `Import réussi — ${parts.join(' · ')}`, ok: true });
       }
       load();
     } catch (err) {
