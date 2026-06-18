@@ -1958,7 +1958,7 @@ export function Dashboard({ onLogout }: Props) {
               { label: 'Jours terrain', value: data.kpi.nb_jours_terrain, color: '#0ea5e9' },
               { label: "Taux d'avancement", value: `${Number(data.kpi.pct_avancement).toFixed(1)}%`, color: '#3b82f6' },
               { label: 'Moyenne par jour', value: moyParEquipe.toFixed(1), sub: 'placettes/équipe/jour', color: '#fbbf24' },
-              { label: 'Placettes contrôlées', value: (data.kpi.nb_controle ?? 0) + (data.kpi.nb_controle_service ?? 0), sub: `/ ${data.kpi.total_visitees}`, color: '#d946ef' },
+              { label: 'Placettes contrôlées', value: (data.kpi.nb_controle ?? 0) + (data.kpi.nb_controle_service ?? 0), sub: '/ 260', color: '#d946ef' },
             ];
           })().map((kpi, i) => (
             <div key={i} style={{ ...S.card, position: 'relative', overflow: 'hidden', padding: '20px 16px 16px', textAlign: 'center' }}>
