@@ -9,7 +9,7 @@ import { TabCarte } from './TabCarte';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const EQUIPE_COLORS = ['#a5b4fc', '#86efac', '#fbbf24', '#f472b6', '#7dd3fc', '#d8b4fe'];
+const EQUIPE_COLORS = ['#a5b4fc', '#86efac', '#fbbf24', '#f472b6', '#7dd3fc', '#d8b4fe', '#fb923c', '#34d399', '#fef08a'];
 const BAR_COLORS    = ['#86efac', '#7dd3fc', '#fbbf24', '#d8b4fe', '#f87171', '#fdba74'];
 const ESSENCE_COLORS = [
   '#38bdf8', '#d946ef', '#fb923c', '#34d399', '#f472b6',
@@ -425,7 +425,7 @@ function TabEquipe({ data }: { data: DashboardData }) {
               <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: color }} />
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
                 <div>
-                  <p style={{ fontSize: 11, color: '#94a3b8', marginBottom: 4 }}>N°{equipeIndex(eq.equipe) + 1}</p>
+                  <p style={{ fontSize: 11, color: '#94a3b8', marginBottom: 4 }}>N°{equipeNum(eq.equipe)}</p>
                   <p style={{ fontSize: 14, fontWeight: 600, color }}>{equipeShort(eq.equipe)}</p>
                 </div>
                 <div style={{ position: 'relative', flexShrink: 0 }}>
@@ -450,14 +450,13 @@ function TabEquipe({ data }: { data: DashboardData }) {
             </div>
           );
         })}
-      </div>
 
-      {/* ── Equipe SREA (contrôle) ── */}
-      <div style={{ ...S.card, position: 'relative', overflow: 'hidden', padding: 20 }}>
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: sreaColor }} />
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        {/* ── Équipes de contrôle — inside grid ── */}
+        <div style={{ ...S.card, position: 'relative', overflow: 'hidden', padding: 20, gridColumn: 'span 2' }}>
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: sreaColor }} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
             <div>
+              <p style={{ fontSize: 11, color: '#94a3b8', marginBottom: 4 }}>Contrôle</p>
               <p style={{ fontSize: 14, fontWeight: 600, color: sreaColor }}>Équipes de contrôle</p>
             </div>
             <div style={{ position: 'relative', flexShrink: 0 }}>
@@ -467,7 +466,7 @@ function TabEquipe({ data }: { data: DashboardData }) {
               </div>
             </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, flex: 1, maxWidth: 400, textAlign: 'center', fontSize: 11 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, textAlign: 'center', fontSize: 11 }}>
             {[
               { label: 'Total', val: sreaTotal, color: undefined },
               { label: 'Contrôlées', val: sreaRealise, color: '#10b981' },
@@ -514,32 +513,31 @@ function TabEquipe({ data }: { data: DashboardData }) {
               </div>
             );
           })}
-        </div>
 
-        {/* SREA linear card */}
-        {(() => {
-          const sreaColor = '#d946ef';
-          const sreaDays = data.temporel.sreaParJour;
-          const sreaNbJours = sreaDays.length;
-          const sreaTotal = sreaDays.reduce((s, d) => s + (d as { date_visite: string; nb_visite: number }).nb_visite, 0);
-          const sreaMoy = sreaNbJours > 0 ? sreaTotal / sreaNbJours : 0;
-          return (
-            <div style={{ ...S.card, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', marginTop: 10, position: 'relative', overflow: 'hidden' }}>
-              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: sreaColor }} />
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{ width: 8, height: 8, borderRadius: '50%', background: sreaColor, flexShrink: 0 }} />
-                <p style={{ fontSize: 13, fontWeight: 600, color: sreaColor }}>Équipes de contrôle</p>
+          {/* ── Équipes de contrôle — inside productivity grid ── */}
+          {(() => {
+            const sreaColor = '#d946ef';
+            const sreaDays = data.temporel.sreaParJour;
+            const sreaNbJours = sreaDays.length;
+            const sreaTotalJours = sreaDays.reduce((s, d) => s + (d as { date_visite: string; nb_visite: number }).nb_visite, 0);
+            const sreaMoy = sreaNbJours > 0 ? sreaTotalJours / sreaNbJours : 0;
+            return (
+              <div style={{ ...S.innerCard, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: sreaColor, flexShrink: 0 }} />
+                  <p style={{ fontSize: 13, fontWeight: 600, color: sreaColor }}>Équipes de contrôle</p>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+                  <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 24, color: sreaColor }}>{sreaMoy.toFixed(1)}</span>
+                  <span style={{ color: '#7a8a9c', fontSize: 12 }}>/ jour</span>
+                </div>
+                <p style={{ fontSize: 11, color: '#94a3b8' }}>
+                  {sreaTotalJours} contrôlées · {sreaNbJours} jours travaillés
+                </p>
               </div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-                <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 24, color: sreaColor }}>{sreaMoy.toFixed(1)}</span>
-                <span style={{ color: '#7a8a9c', fontSize: 12 }}>/ jour</span>
-              </div>
-              <p style={{ fontSize: 11, color: '#94a3b8' }}>
-                {sreaTotal} contrôlées · {sreaNbJours} jours travaillés
-              </p>
-            </div>
-          );
-        })()}
+            );
+          })()}
+        </div>
       </Card>
 
       <Card title="Répartition des placettes par équipe">
@@ -1105,7 +1103,7 @@ function TabTemporel({ data }: { data: DashboardData }) {
           const sreaColor = '#d946ef';
           const total = sreaParJour.reduce((s, d) => s + (d as { date_visite: string; nb_visite: number }).nb_visite, 0);
           return (
-            <div style={{ ...S.card, padding: 16, position: 'relative', overflow: 'hidden', gridColumn: 'span 2' }}>
+            <div style={{ ...S.card, padding: 16, position: 'relative', overflow: 'hidden' }}>
               <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: sreaColor }} />
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
@@ -1232,10 +1230,17 @@ function GroupedBarChart({ equipes }: { equipes: AccessibiliteEquipe[] }) {
   }
 
   // SVG viewport
-  const ML = 44, MR = 20, MT = 24, MB = 40;
+  const ML = 44, MR = 20, MT = 24, MB = 52;
   const VW = 660, VH = 300;
   const cW = VW - ML - MR;
   const cH = VH - MT - MB;
+  const getNum  = (name: string) => { const m = name.match(/N°(\d+)/); return m ? `N°${m[1]}` : ''; };
+  const getNoun = (name: string) => {
+    let s = name.replace(/^Equipe\s+/, '').replace(/\s*\(N°[^)]+\)/, '').trim();
+    if (s.startsWith('Khémisset-')) s = s.slice('Khémisset-'.length);
+    if (s.includes('_')) s = s.slice(s.lastIndexOf('_') + 1);
+    return s;
+  };
 
   // Y scale
   const allVals = equipes.flatMap(eq => ACC_SERIES.map(s => eq[s.key] ?? 0));
@@ -1311,8 +1316,12 @@ function GroupedBarChart({ equipes }: { equipes: AccessibiliteEquipe[] }) {
               );
             })}
             <text x={labelX} y={MT + cH + 14}
-              textAnchor="middle" fontSize={10} fill="#bac4d0">
-              {equipeShort(eq.equipe)}
+              textAnchor="middle" fontSize={10} fill="#bac4d0" fontWeight="600">
+              {getNum(eq.equipe)}
+            </text>
+            <text x={labelX} y={MT + cH + 28}
+              textAnchor="middle" fontSize={8.5} fill="#dde4ec">
+              {getNoun(eq.equipe)}
             </text>
           </g>
         );
