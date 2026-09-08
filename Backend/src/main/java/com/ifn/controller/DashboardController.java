@@ -341,7 +341,8 @@ public class DashboardController {
                 "     ELSE 'programmee' END AS statut, " +
                 "COALESCE(reg.plot_accessibilite, ctrl.plot_accessibilite, cs.plot_accessibilite) AS accessibilite, " +
                 "COALESCE(reg.plot_accessibility_a_pied, ctrl.plot_accessibility_a_pied, cs.plot_accessibility_a_pied) AS a_pied, " +
-                "COALESCE(reg.date_modified, ctrl.date_modified, cs.date_modified) AS date_modified " +
+                "COALESCE(reg.date_modified, ctrl.date_modified, cs.date_modified) AS date_modified, " +
+                "COALESCE(reg.date_created, ctrl.date_created, cs.date_created) AS date_created " +
                 "FROM ifn_programme p " +
                 "LEFT JOIN plot reg  ON reg.plot_no  = p.num_placette " +
                 "LEFT JOIN plot ctrl ON ctrl.plot_no = p.num_placette || 'C' " +

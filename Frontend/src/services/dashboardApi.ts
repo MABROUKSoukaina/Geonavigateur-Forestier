@@ -8,6 +8,10 @@ export function getToken(): string | null {
   return localStorage.getItem('jwt_token');
 }
 
+export function getUsername(): string | null {
+  return localStorage.getItem('jwt_username');
+}
+
 export function clearAuth(): void {
   localStorage.removeItem('jwt_token');
   localStorage.removeItem('jwt_username');
@@ -82,6 +86,7 @@ export interface MapFeature {
     accessibilite: number | null;
     a_pied: number | null;
     date_modified: string | null;
+    date_created: string | null;
   };
 }
 

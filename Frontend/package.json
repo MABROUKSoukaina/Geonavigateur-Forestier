@@ -15,6 +15,7 @@
     "@mui/icons-material": "^6.4.0",
     "@mui/material": "^6.4.0",
     "@tmcw/togeojson": "^7.1.2",
+    "jszip": "^3.10.1",
     "leaflet": "^1.9.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

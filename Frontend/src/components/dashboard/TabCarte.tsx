@@ -4,7 +4,8 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import Checkbox from '@mui/material/Checkbox';
 import type { DashboardData } from '../../services/dashboardApi';
-import { fetchMapGeoJson, type MapFeature } from '../../services/dashboardApi';
+import { fetchMapGeoJson, getUsername, type MapFeature } from '../../services/dashboardApi';
+import { exportCSV, exportXLSX, exportKML, exportSHP } from './exportUtils';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -224,6 +225,7 @@ export function TabCarte({ data }: Props) {
   const searchRef = useRef<HTMLDivElement>(null);
   const [resetTrigger, setResetTrigger] = useState(0);
   const [zoom, setZoom] = useState(8);
+  const [exportOpen, setExportOpen] = useState(false);
 
   const toolbarRef = useRef<HTMLDivElement>(null);
 
@@ -695,7 +697,7 @@ export function TabCarte({ data }: Props) {
 
         </div>{/* end left group */}
 
-        {/* ── Right: count + reset ───────────────────────────────────────── */}
+        {/* ── Right: count + reset + export ─────────────────────────────── */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           <div style={{ width: 1, height: 22, background: 'rgba(255,255,255,0.1)' }} />
 
@@ -709,7 +711,7 @@ export function TabCarte({ data }: Props) {
             </span>
           </div>
 
-          {/* Reset filters — standalone icon button, only when filters active */}
+          {/* Reset filters */}
           {hasFilters && (
             <button
               onClick={() => { setSelStatuts(new Set()); setSelControle(new Set()); setSelEquipes(new Set()); setSelEssences(new Set()); setSelAccessibilite(new Set()); }}
@@ -725,6 +727,90 @@ export function TabCarte({ data }: Props) {
                 <path d="M3 3v5h5"/>
               </svg>
             </button>
+          )}
+
+          {/* Export button — admin only */}
+          {!loading && filtered.length > 0 && getUsername() === 'admin' && (
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={() => setExportOpen(o => !o)}
+                title="Exporter les données"
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  height: 26, padding: '0 10px', borderRadius: 8,
+                  background: exportOpen ? 'rgba(16,185,129,0.15)' : '#1a2540',
+                  border: `1px solid ${exportOpen ? 'rgba(16,185,129,0.5)' : 'rgba(255,255,255,0.1)'}`,
+                  cursor: 'pointer', fontSize: 11,
+                  color: exportOpen ? '#6ee7b7' : '#bac4d0',
+                }}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                Exporter
+              </button>
+
+              {exportOpen && (
+                <div style={{
+                  position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 2000,
+                  background: '#162035', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12,
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.4)', padding: '10px 0',
+                  minWidth: 180,
+                }}>
+                  <p style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.07em', margin: 0, padding: '0 14px 8px' }}>
+                    {filtered.length.toLocaleString()} placette{filtered.length > 1 ? 's' : ''}
+                  </p>
+                  {[
+                    {
+                      fmt: 'Excel', desc: 'Classeur .xlsx', color: '#7a8a9c',
+                      action: () => { exportXLSX(filtered); setExportOpen(false); },
+                      svg: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+                        <line x1="9" y1="13" x2="15" y2="19"/><line x1="15" y1="13" x2="9" y2="19"/>
+                      </svg>,
+                    },
+                    {
+                      fmt: 'CSV', desc: 'Texte brut, universel', color: '#7a8a9c',
+                      action: () => { exportCSV(filtered); setExportOpen(false); },
+                      svg: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/>
+                      </svg>,
+                    },
+                    {
+                      fmt: 'KML', desc: 'Google Earth', color: '#7a8a9c',
+                      action: () => { exportKML(filtered); setExportOpen(false); },
+                      svg: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                      </svg>,
+                    },
+                    {
+                      fmt: 'Shapefile', desc: 'QGIS, ArcGIS (.zip)', color: '#7a8a9c',
+                      action: () => { exportSHP(filtered).then(() => setExportOpen(false)); },
+                      svg: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/>
+                      </svg>,
+                    },
+                  ].map(({ fmt, svg, color, desc, action }) => (
+                    <button key={fmt} onClick={action} style={{
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      width: '100%', border: 'none', background: 'none', cursor: 'pointer',
+                      padding: '8px 14px', textAlign: 'left',
+                    }}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                    >
+                      <span style={{ color, flexShrink: 0, display: 'flex' }}>{svg}</span>
+                      <div>
+                        <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: '#dde4ec' }}>{fmt}</p>
+                        <p style={{ margin: 0, fontSize: 10, color: '#7a8a9c' }}>{desc}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
         </div>{/* end right group */}
 

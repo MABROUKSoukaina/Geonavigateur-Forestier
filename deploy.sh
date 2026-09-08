@@ -20,8 +20,9 @@ echo "=== 3/4  Building backend JAR ==="
 cd "$ROOT/Backend"
 ./mvnw clean package -DskipTests -q
 
-echo "=== 4/4  Copying JAR to deployment folder ==="
+echo "=== 4/4  Copying JAR and config to deployment folder ==="
 cp target/*.jar "$DEPLOY/"
+cp src/main/resources/application.properties "$DEPLOY/"
 
 echo ""
 echo "=== Done! Restart the service to apply changes ==="
