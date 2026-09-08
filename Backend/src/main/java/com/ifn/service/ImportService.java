@@ -1,6 +1,7 @@
 package com.ifn.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
@@ -18,6 +19,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class ImportService {
 
@@ -31,6 +33,14 @@ public class ImportService {
 
     private static String keyCol(String table) {
         return "plot".equals(table) ? "plot_no" : "plot_plot_no";
+    }
+
+    /** Collect writes its CSV exports with a UTF-8 BOM (EF BB BF). */
+    private static byte[] stripBom(byte[] b) {
+        if (b.length >= 3 && (b[0] & 0xFF) == 0xEF && (b[1] & 0xFF) == 0xBB && (b[2] & 0xFF) == 0xBF) {
+            return Arrays.copyOfRange(b, 3, b.length);
+        }
+        return b;
     }
 
     /**
@@ -80,13 +90,12 @@ public class ImportService {
         for (String table : importOrder) {
             int[] counts = importTableCsv(table, csvFiles.get(table));
             if ("plot".equals(table)) {
-                // Return inserted/updated breakdown for plots
                 Map<String, Integer> plotStats = new LinkedHashMap<>();
                 plotStats.put("inserted", counts[0]);
                 plotStats.put("updated",  counts[1]);
                 result.put("plot", plotStats);
             } else {
-                result.put(table, counts[0]); // total rows for detail tables
+                result.put(table, counts[0]);
             }
         }
 
@@ -109,8 +118,12 @@ public class ImportService {
             throw new IllegalStateException("Table '" + table + "' introuvable dans la base de données");
         }
 
-        // Parse CSV fully before touching the DB
+        // Parse CSV fully before touching the DB.
+        // The BOM must be stripped from the bytes: Commons CSV does not remove it, so the
+        // first header would arrive as U+FEFF + "plot_no", get filtered out below as
+        // unknown, and every row would then be inserted with plot_no NULL.
         List<String> headers;
+        List<String> ignoredHeaders = new ArrayList<>();
         List<Object[]> rows = new ArrayList<>();
 
         try (CSVParser parser = CSVFormat.DEFAULT.builder()
@@ -120,13 +133,15 @@ public class ImportService {
                 .setTrim(true)
                 .setIgnoreEmptyLines(true)
                 .build()
-                .parse(new InputStreamReader(new ByteArrayInputStream(csvBytes), StandardCharsets.UTF_8))) {
+                .parse(new InputStreamReader(new ByteArrayInputStream(stripBom(csvBytes)), StandardCharsets.UTF_8))) {
 
-            headers = parser.getHeaderNames().stream()
+            List<String> csvHeaders = parser.getHeaderNames().stream()
                 .map(String::toLowerCase)
-                .filter(colTypes::containsKey)
                 .distinct()
                 .toList();
+
+            headers = csvHeaders.stream().filter(colTypes::containsKey).toList();
+            csvHeaders.stream().filter(h -> !colTypes.containsKey(h)).forEach(ignoredHeaders::add);
 
             if (headers.isEmpty()) return new int[]{0, 0};
 
@@ -145,11 +160,23 @@ public class ImportService {
         // Collect unique key values from the CSV
         String keyCol = keyCol(table);
         int keyIdx = headers.indexOf(keyCol);
+        if (keyIdx < 0) {
+            // Without the key column nothing can be matched or deleted, and every row
+            // would be inserted with a NULL key. Refuse rather than corrupt the table.
+            throw new IllegalStateException(
+                "Colonne clé '" + keyCol + "' absente de " + table + ".csv — import annulé. " +
+                "Colonnes ignorées : " + ignoredHeaders);
+        }
+
         Set<String> keys = new LinkedHashSet<>();
-        if (keyIdx >= 0) {
-            for (Object[] row : rows) {
-                if (row[keyIdx] != null) keys.add(row[keyIdx].toString());
-            }
+        for (Object[] row : rows) {
+            if (row[keyIdx] != null) keys.add(row[keyIdx].toString());
+        }
+        if (keys.size() != rows.size()) {
+            log.warn("{}.csv : {} lignes pour {} clés distinctes", table, rows.size(), keys.size());
+        }
+        if (!ignoredHeaders.isEmpty()) {
+            log.warn("{}.csv : colonnes ignorées (absentes de la table) : {}", table, ignoredHeaders);
         }
 
         // Count how many of those keys already exist in the DB
@@ -181,8 +208,25 @@ public class ImportService {
             rows
         );
 
-        int total   = rows.size();
-        int updated = existingCount;
+        // Step 3 — confirm every key really landed, so a silently dropped row
+        // rolls the transaction back instead of leaving a gap in the table.
+        if (!keys.isEmpty()) {
+            String checkIn = keys.stream().map(k -> "?").collect(Collectors.joining(","));
+            Integer landed = jdbc.queryForObject(
+                "SELECT COUNT(DISTINCT " + keyCol + ") FROM " + table +
+                " WHERE " + keyCol + " IN (" + checkIn + ")",
+                Integer.class,
+                keys.toArray()
+            );
+            if (landed == null || landed != keys.size()) {
+                throw new IllegalStateException(
+                    "Import " + table + " incohérent : " + keys.size() + " clés attendues, " +
+                    (landed == null ? 0 : landed) + " présentes après insertion — transaction annulée.");
+            }
+        }
+
+        int total    = rows.size();
+        int updated  = existingCount;
         int inserted = total - updated;
         return new int[]{inserted, updated};
     }

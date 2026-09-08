@@ -3,6 +3,7 @@ package com.ifn.controller;
 import com.ifn.service.ImportService;
 import com.ifn.service.RefreshNotifier;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -13,6 +14,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/import")
+@Slf4j
 @RequiredArgsConstructor
 public class ImportController {
 
@@ -37,8 +39,16 @@ public class ImportController {
             refreshNotifier.notifyRefresh();
             return ResponseEntity.ok(result);
         } catch (IOException e) {
+            log.error("Lecture du ZIP impossible", e);
             return ResponseEntity.internalServerError()
-                    .body(Map.of("error", e.getMessage()));
+                    .body(Map.of("error", "Lecture du ZIP impossible : " + e.getMessage()));
+        } catch (RuntimeException e) {
+            // JdbcTemplate throws unchecked DataAccessException — without this the
+            // import fails with an empty 500 and nothing in the log.
+            log.error("Échec de l'import", e);
+            String msg = e.getMessage() != null ? e.getMessage() : e.toString();
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("error", msg));
         }
     }
 }
