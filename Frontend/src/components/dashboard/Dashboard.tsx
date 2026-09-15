@@ -9,7 +9,7 @@ import { TabCarte } from './TabCarte';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const EQUIPE_COLORS = ['#a5b4fc', '#86efac', '#fbbf24', '#f472b6', '#7dd3fc', '#d8b4fe', '#fb923c', '#34d399', '#fef08a'];
+const EQUIPE_COLORS = ['#a5b4fc', '#86efac', '#fbbf24', '#f472b6', '#7dd3fc', '#d8b4fe', '#fb923c', '#34d399', '#fef08a', '#c6f78d'];
 const BAR_COLORS    = ['#86efac', '#7dd3fc', '#fbbf24', '#d8b4fe', '#f87171', '#fdba74'];
 const ESSENCE_COLORS = [
   '#38bdf8', '#d946ef', '#fb923c', '#34d399', '#f472b6',
@@ -452,7 +452,7 @@ function TabEquipe({ data }: { data: DashboardData }) {
         })}
 
         {/* ── Équipes de contrôle — inside grid ── */}
-        <div style={{ ...S.card, position: 'relative', overflow: 'hidden', padding: 20, gridColumn: 'span 2' }}>
+        <div style={{ ...S.card, position: 'relative', overflow: 'hidden', padding: 20 }}>
           <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: sreaColor }} />
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
             <div>
