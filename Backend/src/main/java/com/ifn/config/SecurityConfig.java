@@ -30,10 +30,14 @@ public class SecurityConfig {
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                .requestMatchers("/api/auth/**").permitAll()
+                .requestMatchers("/api/auth/login").permitAll()
+                .requestMatchers("/api/auth/me").authenticated()          // current-user profile
+                .requestMatchers("/api/users/**").hasRole("ADMIN")        // user management (ADMIN only)
+                .requestMatchers("/api/me/**").authenticated()            // team-scoped collector endpoints
                 .requestMatchers("/api/dashboard/events").permitAll()
                 .requestMatchers("/api/dashboard/notify").permitAll()     // sync script, secured by secret header
                 .requestMatchers("/api/dashboard/**").authenticated()     // only dashboard needs JWT
+                .requestMatchers("/api/statistics/**").authenticated()    // statistics dashboard, same JWT
                 .anyRequest().permitAll()
             )
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);

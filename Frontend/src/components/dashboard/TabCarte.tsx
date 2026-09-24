@@ -25,6 +25,15 @@ const BASEMAPS = [
 ] as const;
 type BasemapId = typeof BASEMAPS[number]['id'];
 
+// Coded-field decoders for the popup's "Détails placette" section — kept in sync
+// with the Python dicts of the same name in Generateur_Fiches_IFN/generate_fiche_simple.py.
+const EXPOSITION: Record<number, string> = { 1: 'Nord', 2: 'Nord-Est', 3: 'Est', 4: 'Sud-Est', 5: 'Sud', 6: 'Sud-Ouest', 7: 'Ouest', 8: 'Nord-Ouest' };
+const TOPO_POS: Record<number, string> = { 1: 'Plat', 2: 'Dépression', 3: 'Sommet', 4: 'Haut versant', 5: 'Mi-versant', 6: 'Bas-versant' };
+const SUBSTRAT: Record<number, string> = { 1: 'Grès', 2: 'Calcaire', 3: 'Schiste', 4: 'Sable', 5: 'Basalte', 6: 'Granite', 7: 'Quartzite', 8: 'Marne', 9: 'Dolomie', 10: 'Autre' };
+const PROFONDEUR: Record<number, string> = { 0: 'Superficiel', 1: 'Moyennement profond', 2: 'Profond' };
+const COUV_SOL: Record<number, string> = { 1: 'Couvert boisé fermé', 2: 'Couvert boisé ouvert', 3: 'Bosquet', 4: 'Matorral' };
+const INT_PARC: Record<number, string> = { 0: 'Nul', 1: 'Faible', 2: 'Moyen', 3: 'Intense' };
+const ETAT_SAN_G: Record<number, string> = { 1: 'Bon', 2: 'Moyen', 3: 'Mauvais' };
 
 type ClassifyMode = 'statut' | 'equipe' | 'essence' | 'accessibilite' | 'controle';
 
@@ -192,6 +201,64 @@ function DropPanel({ children, style }: { children: ReactNode; style?: CSSProper
       minWidth: 240, ...style,
     }}>
       {children}
+    </div>
+  );
+}
+
+/** Collapsible "Détails placette" block at the bottom of a marker popup — pédologie,
+ * couverture végétale, caractéristiques spécifiques, incendie, liège. Hidden entirely
+ * when none of those fields have data (e.g. a plot not yet visited). */
+/** Substrat label — codes 4 (Sable) and 10 (Autre) carry a free-text qualifier that
+ * replaces the plain code label, matching generate_fiche_simple.py's `_substrat_val` logic. */
+function substratLabel(p: MapFeature['properties']): string | null {
+  if (p.substrat == null) return null;
+  if (p.substrat === 10 && p.substrat_autre) return `Autre : ${p.substrat_autre}`;
+  if (p.substrat === 4 && p.substrat_qualifier) return `Sable : ${p.substrat_qualifier}`;
+  return SUBSTRAT[p.substrat] ?? String(p.substrat);
+}
+
+function PlotDetailsToggle({ f }: { f: MapFeature }) {
+  const [open, setOpen] = useState(false);
+  const p = f.properties;
+  const hasLiege = p.nb_demascle > 0 || p.nb_non_demascle > 0;
+  const substrat = substratLabel(p);
+
+  const hasDetails =
+    p.strate_terrain || p.exposition != null || p.position_topo != null ||
+    p.substrat != null || p.profondeur_sol != null || p.couverture_sol != null ||
+    p.hauteur_dominante != null || p.intensite_parcours != null ||
+    p.etat_sanitaire != null || p.signe_incendie != null || hasLiege;
+
+  if (!hasDetails) return null;
+
+  return (
+    <div style={{ marginTop: 8, paddingTop: 7, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{
+          background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+          fontSize: 11, fontWeight: 600, color: '#7dd3fc',
+          display: 'flex', alignItems: 'center', gap: 4,
+        }}
+      >
+        <span style={{ display: 'inline-block', transform: open ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }}>▸</span>
+        Détails placette
+      </button>
+      {open && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '5px 14px', fontSize: 12, marginTop: 7 }}>
+          {p.strate_terrain && <><span style={{ color: '#94a3b8' }}>Strate terrain</span><span style={{ color: '#edf1f5', fontWeight: 600 }}>{p.strate_terrain}</span></>}
+          {p.exposition != null && <><span style={{ color: '#94a3b8' }}>Exposition</span><span style={{ color: '#edf1f5', fontWeight: 600 }}>{EXPOSITION[p.exposition] ?? p.exposition}</span></>}
+          {p.position_topo != null && <><span style={{ color: '#94a3b8' }}>Position topo.</span><span style={{ color: '#edf1f5', fontWeight: 600 }}>{TOPO_POS[p.position_topo] ?? p.position_topo}</span></>}
+          {substrat && <><span style={{ color: '#94a3b8' }}>Substrat</span><span style={{ color: '#edf1f5', fontWeight: 600 }}>{substrat}</span></>}
+          {p.profondeur_sol != null && <><span style={{ color: '#94a3b8' }}>Profondeur sol</span><span style={{ color: '#edf1f5', fontWeight: 600 }}>{PROFONDEUR[p.profondeur_sol] ?? p.profondeur_sol}</span></>}
+          {p.couverture_sol != null && <><span style={{ color: '#94a3b8' }}>Couv. du sol</span><span style={{ color: '#edf1f5', fontWeight: 600 }}>{COUV_SOL[p.couverture_sol] ?? p.couverture_sol}</span></>}
+          {p.hauteur_dominante != null && <><span style={{ color: '#94a3b8' }}>Ht moy. dominante</span><span style={{ color: '#edf1f5', fontWeight: 600 }}>{p.hauteur_dominante} m</span></>}
+          {p.intensite_parcours != null && <><span style={{ color: '#94a3b8' }}>Intensité parcours</span><span style={{ color: '#edf1f5', fontWeight: 600 }}>{INT_PARC[p.intensite_parcours] ?? p.intensite_parcours}</span></>}
+          {p.etat_sanitaire != null && <><span style={{ color: '#94a3b8' }}>État sanitaire</span><span style={{ color: '#edf1f5', fontWeight: 600 }}>{ETAT_SAN_G[p.etat_sanitaire] ?? p.etat_sanitaire}</span></>}
+          {p.signe_incendie != null && <><span style={{ color: '#94a3b8' }}>Signe d'incendie</span><span style={{ color: '#edf1f5', fontWeight: 600 }}>{p.signe_incendie ? 'Oui' : 'Non'}</span></>}
+          {hasLiege && <><span style={{ color: '#94a3b8' }}>Liège</span><span style={{ color: '#edf1f5', fontWeight: 600 }}>{p.nb_demascle} démasclés / {p.nb_non_demascle} non démasclés</span></>}
+        </div>
+      )}
     </div>
   );
 }
@@ -379,6 +446,7 @@ export function TabCarte({ data }: Props) {
             <span style={{ fontWeight: 700, color: '#bac4d0' }}>Repère : </span>{f.properties.description_repere}
           </div>
         )}
+        <PlotDetailsToggle f={f} />
       </div>
     );
   };

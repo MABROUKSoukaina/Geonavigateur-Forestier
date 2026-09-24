@@ -6,6 +6,7 @@ import { Sidebar } from './components/layout/Sidebar';
 import { MapView } from './components/map/MapView';
 import { Dashboard } from './components/dashboard/Dashboard';
 import { Login } from './components/dashboard/Login';
+import { StatisticsApp } from './statistics/StatisticsApp';
 import { useAppStore } from './stores/useAppStore';
 import { useDataStore } from './stores/useDataStore';
 import { initOfflineRouter } from './services/offlineRouter';
@@ -184,11 +185,22 @@ function ProtectedDashboard() {
   return <Dashboard onLogout={handleLogout} />;
 }
 
+function ProtectedStatistics() {
+  const [token, setToken] = useState<string | null>(() => getToken());
+
+  const handleLogin = (t: string) => setToken(t);
+  const handleLogout = () => { clearAuth(); setToken(null); };
+
+  if (!token) return <Login onLogin={handleLogin} />;
+  return <StatisticsApp onLogout={handleLogout} />;
+}
+
 export default function App() {
   return (
     <Routes>
       <Route path="/" element={<ProtectedMap />} />
       <Route path="/dashboard" element={<ProtectedDashboard />} />
+      <Route path="/dashboard/statistic" element={<ProtectedStatistics />} />
     </Routes>
   );
 }

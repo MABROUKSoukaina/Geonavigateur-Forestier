@@ -330,10 +330,19 @@ public class DashboardController {
     @GetMapping("/map")
     public ResponseEntity<Map<String, Object>> getMapData() {
         // Two separate joins: regular visit (exact match) + control visit (num_placette + 'C')
+        // tree_liege : per-plot démasclage counts (chêne-liège), joined once per visit variant.
         String sql =
+                "WITH tree_liege AS ( " +
+                "  SELECT plot_plot_no, " +
+                "    COUNT(*) FILTER (WHERE treecl_etat_demasclage = 1) AS nb_demascle, " +
+                "    COUNT(*) FILTER (WHERE treecl_etat_demasclage = 2) AS nb_non_demascle " +
+                "  FROM tree WHERE tree_liege = true GROUP BY plot_plot_no " +
+                ") " +
                 "SELECT p.num_placette, p.x_centre AS lon, p.y_centre AS lat, " +
                 "p.equipe, p.strate_cartographique AS strate, p.essence_group, p.dpanef, " +
-                "p.altitude, p.pente, p.x_repere, p.y_repere, " +
+                "COALESCE(reg.donnees_topographiques_plot_elevation, ctrl.donnees_topographiques_plot_elevation, cs.donnees_topographiques_plot_elevation, p.altitude) AS altitude, " +
+                "COALESCE(reg.donnees_topographiques_plot_pente, ctrl.donnees_topographiques_plot_pente, cs.donnees_topographiques_plot_pente, p.pente) AS pente, " +
+                "p.x_repere, p.y_repere, " +
                 "p.description_repere, p.distance_repere, p.azimut_repere, " +
                 "CASE WHEN cs.plot_no  IS NOT NULL THEN 'controle' " +
                 "     WHEN ctrl.plot_no IS NOT NULL THEN 'controle' " +
@@ -342,11 +351,29 @@ public class DashboardController {
                 "COALESCE(reg.plot_accessibilite, ctrl.plot_accessibilite, cs.plot_accessibilite) AS accessibilite, " +
                 "COALESCE(reg.plot_accessibility_a_pied, ctrl.plot_accessibility_a_pied, cs.plot_accessibility_a_pied) AS a_pied, " +
                 "COALESCE(reg.date_modified, ctrl.date_modified, cs.date_modified) AS date_modified, " +
-                "COALESCE(reg.date_created, ctrl.date_created, cs.date_created) AS date_created " +
+                "COALESCE(reg.date_created, ctrl.date_created, cs.date_created) AS date_created, " +
+                "COALESCE(reg.plot_stratum, ctrl.plot_stratum, cs.plot_stratum) AS strate_terrain, " +
+                "COALESCE(reg.donnees_topographiques_plot_topo_exposition, ctrl.donnees_topographiques_plot_topo_exposition, cs.donnees_topographiques_plot_topo_exposition) AS exposition, " +
+                "COALESCE(reg.donnees_topographiques_plot_topo_position, ctrl.donnees_topographiques_plot_topo_position, cs.donnees_topographiques_plot_topo_position) AS position_topo, " +
+                "COALESCE(reg.description_pedologique_substrat, ctrl.description_pedologique_substrat, cs.description_pedologique_substrat) AS substrat, " +
+                "COALESCE(reg.description_pedologique_substrat_qualifier, ctrl.description_pedologique_substrat_qualifier, cs.description_pedologique_substrat_qualifier) AS substrat_qualifier, " +
+                "COALESCE(reg.description_pedologique_type_sol1, ctrl.description_pedologique_type_sol1, cs.description_pedologique_type_sol1, " +
+                "         reg.description_pedologique_type_sol,  ctrl.description_pedologique_type_sol,  cs.description_pedologique_type_sol) AS substrat_autre, " +
+                "COALESCE(reg.description_pedologique_profondeur_du_sol, ctrl.description_pedologique_profondeur_du_sol, cs.description_pedologique_profondeur_du_sol) AS profondeur_sol, " +
+                "COALESCE(reg.couverture_vegetale_couverture_du_sol, ctrl.couverture_vegetale_couverture_du_sol, cs.couverture_vegetale_couverture_du_sol) AS couverture_sol, " +
+                "COALESCE(reg.couverture_vegetale_hauteur_moyenne_dominante, ctrl.couverture_vegetale_hauteur_moyenne_dominante, cs.couverture_vegetale_hauteur_moyenne_dominante) AS hauteur_dominante, " +
+                "COALESCE(reg.caractristiques_specifiques_plot_intensite_de_parcours, ctrl.caractristiques_specifiques_plot_intensite_de_parcours, cs.caractristiques_specifiques_plot_intensite_de_parcours) AS intensite_parcours, " +
+                "COALESCE(reg.caractristiques_specifiques_plot_etat, ctrl.caractristiques_specifiques_plot_etat, cs.caractristiques_specifiques_plot_etat) AS etat_sanitaire, " +
+                "COALESCE(reg.caractristiques_specifiques_plot_signes_incendies, ctrl.caractristiques_specifiques_plot_signes_incendies, cs.caractristiques_specifiques_plot_signes_incendies) AS signe_incendie, " +
+                "COALESCE(tl_reg.nb_demascle, tl_ctrl.nb_demascle, tl_cs.nb_demascle, 0) AS nb_demascle, " +
+                "COALESCE(tl_reg.nb_non_demascle, tl_ctrl.nb_non_demascle, tl_cs.nb_non_demascle, 0) AS nb_non_demascle " +
                 "FROM ifn_programme p " +
                 "LEFT JOIN plot reg  ON reg.plot_no  = p.num_placette " +
                 "LEFT JOIN plot ctrl ON ctrl.plot_no = p.num_placette || 'C' " +
                 "LEFT JOIN plot cs   ON cs.plot_no   = p.num_placette || 'CS' " +
+                "LEFT JOIN tree_liege tl_reg  ON tl_reg.plot_plot_no  = reg.plot_no " +
+                "LEFT JOIN tree_liege tl_ctrl ON tl_ctrl.plot_plot_no = ctrl.plot_no " +
+                "LEFT JOIN tree_liege tl_cs   ON tl_cs.plot_plot_no   = cs.plot_no " +
                 "WHERE p.x_centre IS NOT NULL AND p.y_centre IS NOT NULL";
 
         List<Map<String, Object>> rows = jdbc.queryForList(sql);

@@ -87,6 +87,21 @@ export interface MapFeature {
     a_pied: number | null;
     date_modified: string | null;
     date_created: string | null;
+    // ── Détails placette (coded fields — see CODE_LABELS in TabCarte.tsx) ──
+    strate_terrain: string | null;
+    exposition: number | null;
+    position_topo: number | null;
+    substrat: number | null;
+    substrat_qualifier: string | null;
+    substrat_autre: string | null;
+    profondeur_sol: number | null;
+    couverture_sol: number | null;
+    hauteur_dominante: number | null;
+    intensite_parcours: number | null;
+    etat_sanitaire: number | null;
+    signe_incendie: boolean | null;
+    nb_demascle: number;
+    nb_non_demascle: number;
   };
 }
 

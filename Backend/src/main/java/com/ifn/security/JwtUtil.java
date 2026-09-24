@@ -32,9 +32,35 @@ public class JwtUtil {
             .compact();
     }
 
+    /** Generate a token carrying role/team claims for the survey collector. */
+    public String generate(String username, String role, String team) {
+        return Jwts.builder()
+            .subject(username)
+            .claim("role", role)
+            .claim("team", team)
+            .issuedAt(new Date())
+            .expiration(new Date(System.currentTimeMillis() + expirationMs))
+            .signWith(key)
+            .compact();
+    }
+
     public String extractUsername(String token) {
         return Jwts.parser().verifyWith(key).build()
             .parseSignedClaims(token).getPayload().getSubject();
+    }
+
+    /** Role claim, or null for legacy tokens that don't carry one. */
+    public String extractRole(String token) {
+        Object role = Jwts.parser().verifyWith(key).build()
+            .parseSignedClaims(token).getPayload().get("role");
+        return role == null ? null : role.toString();
+    }
+
+    /** Team claim, or null. */
+    public String extractTeam(String token) {
+        Object team = Jwts.parser().verifyWith(key).build()
+            .parseSignedClaims(token).getPayload().get("team");
+        return team == null ? null : team.toString();
     }
 
     public boolean isValid(String token) {

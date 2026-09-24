@@ -1,0 +1,49 @@
+/* Scoped to .ifn-statistics (the Statistics page's own root) so nothing here leaks onto
+ * the main dashboard's own map/popups, and nothing from the main app's global index.css
+ * (which already styles .leaflet-popup-content-wrapper / .leaflet-control-attribution for
+ * its own map) leaks in here. Literal colors, not CSS custom properties — a second :root
+ * block would redefine the main app's own --text/--border globally. */
+
+.ifn-statistics .leaflet-container { background: #0a1018; font-family: inherit; }
+
+.ifn-statistics .leaflet-control-attribution {
+  background: rgba(14, 22, 33, 0.72) !important;
+  color: #64748b !important;
+  font-size: 9px !important;
+  border-radius: 6px 0 0 0;
+}
+.ifn-statistics .leaflet-control-attribution a { color: #8b9bb0 !important; }
+
+.ifn-statistics .leaflet-control-scale-line {
+  background: rgba(14, 22, 33, 0.85) !important;
+  border-color: rgba(255, 255, 255, 0.35) !important;
+  color: #e6edf5 !important;
+  font-size: 10px !important;
+  padding: 2px 6px !important;
+  border-radius: 0 0 5px 0;
+}
+
+.ifn-statistics .ifn-popup .leaflet-popup-content-wrapper {
+  background: #16212f !important;
+  color: #e6edf5 !important;
+  border: 1px solid rgba(255, 255, 255, 0.13) !important;
+  border-radius: 13px !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55) !important;
+  padding: 14px 16px !important;
+}
+.ifn-statistics .ifn-popup .leaflet-popup-content { margin: 0 !important; line-height: normal !important; }
+.ifn-statistics .ifn-popup .leaflet-popup-tip { background: #16212f !important; }
+.ifn-statistics .ifn-popup .leaflet-popup-close-button {
+  color: #64748b !important;
+  font-size: 18px !important;
+  top: 7px !important;
+  right: 9px !important;
+}
+.ifn-statistics .ifn-popup .leaflet-popup-close-button:hover { color: #e6edf5 !important; }
+
+.ifn-statistics ::-webkit-scrollbar { width: 9px; height: 9px; }
+.ifn-statistics ::-webkit-scrollbar-track { background: transparent; }
+.ifn-statistics ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.11); border-radius: 5px; }
+.ifn-statistics ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.2); }
+
+@keyframes ifn-spin { to { transform: rotate(360deg); } }
