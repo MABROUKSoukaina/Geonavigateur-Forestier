@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import ForestIcon from '@mui/icons-material/Forest';
 import LogoutIcon from '@mui/icons-material/Logout';
 import PersonIcon from '@mui/icons-material/Person';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
@@ -34,7 +33,7 @@ export interface AnalyseSelection {
 
 export function TopBar({
   page, onNavigate, analyse, onAnalyseChange, ecosystemeOptions, username, onLogout,
-  activeLabel, activeCount, onClearAll,
+  activeLabel, activeCount, onClearAll, totalProgramme,
 }: {
   page: Page;
   onNavigate: (p: Page) => void;
@@ -46,6 +45,7 @@ export function TopBar({
   activeLabel: string;
   activeCount: number;
   onClearAll: () => void;
+  totalProgramme?: number;
 }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -57,13 +57,14 @@ export function TopBar({
         }}>
           <ArrowBackIcon style={{ fontSize: 17 }} />
         </Link>
-        <ForestIcon style={{ fontSize: 30, color: T.greenLite, flexShrink: 0 }} />
+        <img src="/anef-logo.png" alt="ANEF" style={{ height: 40, width: 'auto', objectFit: 'contain', flexShrink: 0 }} />
+        <div style={{ width: 1, height: 34, background: T.border, flexShrink: 0 }} />
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 17, fontWeight: 700, color: T.text, lineHeight: 1.1, letterSpacing: '-0.01em' }}>
-            IFN 2026 · Statistiques
+          <div style={{ fontSize: 22, fontWeight: 700, color: T.text, lineHeight: 1.1, letterSpacing: '-0.02em' }}>
+            Inventaire Forestier National 2026
           </div>
-          <div style={{ fontSize: 10.5, color: T.dim, lineHeight: 1.3 }}>
-            Inventaire Forestier National · DRANEF Rabat-Salé-Kénitra
+          <div style={{ fontSize: 13, color: T.muted, marginTop: 3, fontWeight: 600, lineHeight: 1.3 }}>
+            DRANEF Rabat-Salé-Kénitra{totalProgramme != null ? ` · ${totalProgramme} placettes programmées` : ''}
           </div>
         </div>
 

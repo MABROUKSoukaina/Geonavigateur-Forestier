@@ -73,6 +73,7 @@ export function StatisticsApp({ onLogout }: { onLogout: () => void }) {
           page={page} onNavigate={setPage}
           analyse={analyse} onAnalyseChange={setAnalyse}
           ecosystemeOptions={ecosystemes}
+          totalProgramme={features.length}
           username={getUsername() ?? ''} onLogout={onLogout}
           activeLabel={activeLabel} activeCount={mapFilters.activeCount} onClearAll={clearEverything}
         />
