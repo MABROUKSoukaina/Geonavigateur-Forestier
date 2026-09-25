@@ -285,6 +285,7 @@ function PopupBody({ f, color, detail }: { f: PlotFeature; color: string; detail
           <Row label="Y">{lat.toFixed(5)}</Row>
           <Row label="DPANEF">{p.dpanef}</Row>
           <Row label="Forêt">{p.foret}</Row>
+          <Row label="Altitude">{p.altitude != null ? `${p.altitude} m` : null}</Row>
         </div>
 
         {done && (

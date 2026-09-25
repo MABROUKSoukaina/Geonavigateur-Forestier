@@ -84,6 +84,8 @@ export interface PlotFeature {
     dpanef: string | null;
     /** Forêt aménagée contenant la placette (jointure spatiale, NULL hors périmètre aménagé). */
     foret: string | null;
+    /** Altitude théorique du programme (ifn_programme.altitude), en m. */
+    altitude: number | null;
     /** Strate dendrométrique de terrain (plot_stratum). */
     strate: string | null;
     /** Composition relevée : pure / melange — null tant que la placette n'est pas visitée. */
