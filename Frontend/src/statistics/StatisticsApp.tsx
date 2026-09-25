@@ -83,7 +83,7 @@ export function StatisticsApp({ onLogout }: { onLogout: () => void }) {
           <SynthesePage
             stats={stats} features={features} formations={formations} ecosystemes={ecosystemes}
             loading={loading} mapFilters={mapFilters}
-            analyse={analyse} onAnalyseChange={setAnalyse}
+            analyse={analyse}
           />
         )}
         {page === 'ecosysteme' && (
