@@ -82,6 +82,8 @@ export interface PlotFeature {
     /** Écosystème relevé sur le terrain (plot.strate_terrain_essence, issu du ZIP Collect). */
     formation: string | null;
     dpanef: string | null;
+    /** Forêt aménagée contenant la placette (jointure spatiale, NULL hors périmètre aménagé). */
+    foret: string | null;
     /** Strate dendrométrique de terrain (plot_stratum). */
     strate: string | null;
     /** Composition relevée : pure / melange — null tant que la placette n'est pas visitée. */

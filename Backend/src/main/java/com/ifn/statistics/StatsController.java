@@ -217,7 +217,7 @@ public class StatsController {
         String sql =
             "WITH " + TREE_CALC_CTE + " " +
             "SELECT p.num_placette, p.x_centre AS lon, p.y_centre AS lat, " +
-            "  p.equipe, p.dpanef, " +
+            "  p.equipe, p.dpanef, p.foret, " +
             // Écosystème observed on the ground, from whichever visit record exists — the
             // single formation source for the whole app (see FormationMapping). Deliberately
             // NOT ifn_programme.essence_group: that column is a photo-interpretation, not a
