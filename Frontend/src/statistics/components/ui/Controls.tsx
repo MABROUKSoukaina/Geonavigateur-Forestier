@@ -158,6 +158,20 @@ export function MultiSelectDropdown({
           background: T.raised, border: `1px solid ${T.borderStrong}`, borderRadius: 10,
           padding: 5, boxShadow: '0 12px 28px rgba(0,0,0,0.45)',
         }}>
+          <label onClick={() => onChange([])} style={{
+            display: 'flex', alignItems: 'center', gap: 9, padding: '6px 8px', borderRadius: 7,
+            cursor: 'pointer', background: value.length === 0 ? 'rgba(16,185,129,0.14)' : 'transparent',
+            marginBottom: 4, paddingBottom: 8, borderBottom: `1px solid ${T.border}`,
+          }}>
+            <span style={{
+              width: 15, height: 15, borderRadius: '50%', flexShrink: 0,
+              border: `1.5px solid ${value.length === 0 ? T.green : T.borderStrong}`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              {value.length === 0 && <span style={{ width: 7, height: 7, borderRadius: '50%', background: T.green }} />}
+            </span>
+            <span style={{ fontSize: 12.5, fontWeight: 600, color: value.length === 0 ? T.text : T.muted, whiteSpace: 'nowrap' }}>{allLabel}</span>
+          </label>
           {options.map(o => {
             const on = value.includes(o.value);
             return (
