@@ -2,9 +2,11 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { T, labelStyle } from '../../theme';
 
 /**
- * Single-choice select styled like the filter boxes.
- * `inline` puts the label beside the control instead of above it — shorter rows, and the
- * control group spreads across the width instead of leaving the panel half empty.
+ * Single-choice select styled like the filter boxes. A native <select>'s own popup
+ * highlight (blue on Windows/Chrome) is drawn by the browser/OS, not by Blink's normal
+ * CSS pipeline, so it can't be recoloured — same reason MultiSelectDropdown below draws
+ * its own list instead of using a native multi-select. `inline` puts the label beside
+ * the control instead of above it.
  */
 export function PlainSelect({ label, value, options, onChange, width = 120, inline = false }: {
   label?: string;
@@ -14,25 +16,71 @@ export function PlainSelect({ label, value, options, onChange, width = 120, inli
   width?: number | string;
   inline?: boolean;
 }) {
-  const select = (
-    <select
-      value={value}
-      onChange={e => onChange(e.target.value)}
-      style={{
-        width: inline ? width : '100%', background: T.panelAlt, border: `1px solid ${T.border}`,
+  const [open, setOpen] = useState(false);
+  const [hovered, setHovered] = useState<string | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [open]);
+
+  const current = options.find(o => o.value === value);
+
+  const control = (
+    <div ref={ref} style={{ position: 'relative', width: inline ? width : '100%' }}>
+      <button type="button" onClick={() => setOpen(o => !o)} style={{
+        width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+        background: T.panelAlt, border: `1px solid ${open ? T.green : T.border}`,
         borderRadius: 9, padding: '7px 8px', color: T.text, fontSize: 12.5,
-        fontFamily: 'inherit', outline: 'none', cursor: 'pointer', accentColor: T.green,
-      }}
-    >
-      {options.map(o => <option key={o.value} value={o.value} style={{ background: T.raised }}>{o.label}</option>)}
-    </select>
+        fontFamily: 'inherit', outline: 'none', cursor: 'pointer', textAlign: 'left',
+      }}>
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{current?.label ?? value}</span>
+        <span style={{
+          color: T.dim, fontSize: 10, flexShrink: 0,
+          transform: open ? 'rotate(180deg)' : undefined, transition: 'transform .15s',
+        }}>▾</span>
+      </button>
+
+      {open && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 5px)', left: 0, minWidth: '100%', width: 'max-content',
+          maxWidth: 280, maxHeight: 280, overflowY: 'auto', zIndex: 2000,
+          background: T.raised, border: `1px solid ${T.borderStrong}`, borderRadius: 10,
+          padding: 5, boxShadow: '0 12px 28px rgba(0,0,0,0.45)',
+        }}>
+          {options.map(o => {
+            const selected = o.value === value;
+            const isHovered = hovered === o.value;
+            return (
+              <div key={o.value}
+                onMouseEnter={() => setHovered(o.value)}
+                onMouseLeave={() => setHovered(h => (h === o.value ? null : h))}
+                onClick={() => { onChange(o.value); setOpen(false); }}
+                style={{
+                  padding: '6px 8px', borderRadius: 7, cursor: 'pointer', fontSize: 12.5, whiteSpace: 'nowrap',
+                  background: selected ? T.green : isHovered ? 'rgba(16,185,129,0.18)' : 'transparent',
+                  color: selected ? '#04170f' : T.text, fontWeight: selected ? 650 : 500,
+                }}
+              >
+                {o.label}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 
   if (inline) {
     return (
       <label style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
         {label && <span style={{ ...labelStyle, whiteSpace: 'nowrap' }}>{label}</span>}
-        {select}
+        {control}
       </label>
     );
   }
@@ -40,7 +88,7 @@ export function PlainSelect({ label, value, options, onChange, width = 120, inli
   return (
     <div style={{ width }}>
       {label && <div style={{ ...labelStyle, marginBottom: 5 }}>{label}</div>}
-      {select}
+      {control}
     </div>
   );
 }
