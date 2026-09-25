@@ -73,7 +73,6 @@ export function StatisticsApp({ onLogout }: { onLogout: () => void }) {
           page={page} onNavigate={setPage}
           analyse={analyse} onAnalyseChange={setAnalyse}
           ecosystemeOptions={ecosystemes}
-          updatedAt={new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
           username={getUsername() ?? ''} onLogout={onLogout}
           activeLabel={activeLabel} activeCount={mapFilters.activeCount} onClearAll={clearEverything}
         />

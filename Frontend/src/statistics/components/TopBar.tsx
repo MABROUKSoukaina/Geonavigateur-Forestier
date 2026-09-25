@@ -33,7 +33,7 @@ export interface AnalyseSelection {
 }
 
 export function TopBar({
-  page, onNavigate, analyse, onAnalyseChange, ecosystemeOptions, updatedAt, username, onLogout,
+  page, onNavigate, analyse, onAnalyseChange, ecosystemeOptions, username, onLogout,
   activeLabel, activeCount, onClearAll,
 }: {
   page: Page;
@@ -41,7 +41,6 @@ export function TopBar({
   analyse: AnalyseSelection;
   onAnalyseChange: (a: AnalyseSelection) => void;
   ecosystemeOptions: string[];
-  updatedAt?: string;
   username: string;
   onLogout: () => void;
   activeLabel: string;
@@ -69,13 +68,6 @@ export function TopBar({
         </div>
 
         <div style={{ flex: 1 }} />
-
-        {updatedAt && (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 10.5, color: T.dim }}>
-            Dernière mise à jour : {updatedAt}
-            <span style={{ width: 7, height: 7, borderRadius: '50%', background: T.green }} />
-          </span>
-        )}
 
         <div style={{
           display: 'flex', alignItems: 'center', gap: 9, paddingLeft: 14,
