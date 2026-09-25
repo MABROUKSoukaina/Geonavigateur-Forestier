@@ -283,9 +283,9 @@ function PopupBody({ f, color, detail }: { f: PlotFeature; color: string; detail
         <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '5px 14px', fontSize: 12 }}>
           <Row label="X">{lon.toFixed(5)}</Row>
           <Row label="Y">{lat.toFixed(5)}</Row>
+          <Row label="Altitude">{p.altitude != null ? `${p.altitude} m` : null}</Row>
           <Row label="DPANEF">{p.dpanef}</Row>
           <Row label="Forêt">{p.foret}</Row>
-          <Row label="Altitude">{p.altitude != null ? `${p.altitude} m` : null}</Row>
         </div>
 
         {done && (
