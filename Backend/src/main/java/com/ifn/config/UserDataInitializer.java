@@ -14,8 +14,7 @@ import org.springframework.stereotype.Component;
  * - Uses CREATE TABLE IF NOT EXISTS, so it never alters or drops any existing
  *   IFN_2026 table used by the dashboard.
  * - Seeds the 4 historical dashboard accounts (admin / directeur / chef_dept /
- *   visiteur) with their original passwords so existing logins keep working, plus
- *   one example field team account.
+ *   visiteur) with their original passwords so existing logins keep working.
  * - Idempotent: only inserts a user when its username is absent.
  */
 @Component
@@ -29,7 +28,6 @@ public class UserDataInitializer implements CommandLineRunner {
     private final String directeurPwd;
     private final String chefPwd;
     private final String visiteurPwd;
-    private final String fieldPwd;
 
     public UserDataInitializer(
             JdbcTemplate jdbc,
@@ -38,8 +36,7 @@ public class UserDataInitializer implements CommandLineRunner {
             @Value("${app.users.admin.password:Admin@IFN26}") String adminPwd,
             @Value("${app.users.directeur.password:Direct@IFN26}") String directeurPwd,
             @Value("${app.users.chef_dept.password:Chef@IFN26}") String chefPwd,
-            @Value("${app.users.visiteur.password:Visit@IFN26}") String visiteurPwd,
-            @Value("${app.users.field.password:Field@IFN26}") String fieldPwd) {
+            @Value("${app.users.visiteur.password:Visit@IFN26}") String visiteurPwd) {
         this.jdbc = jdbc;
         this.users = users;
         this.encoder = encoder;
@@ -47,7 +44,6 @@ public class UserDataInitializer implements CommandLineRunner {
         this.directeurPwd = directeurPwd;
         this.chefPwd = chefPwd;
         this.visiteurPwd = visiteurPwd;
-        this.fieldPwd = fieldPwd;
     }
 
     @Override
@@ -69,9 +65,6 @@ public class UserDataInitializer implements CommandLineRunner {
         seed("directeur", directeurPwd, "Directeur DRANEF",      "SUPERVISOR", null);
         seed("chef_dept", chefPwd,      "Chef de département",   "SUPERVISOR", null);
         seed("visiteur",  visiteurPwd,  "Visiteur",              "VIEWER",     null);
-        // Example field team account — links to a real ifn_programme.equipe value.
-        seed("equipe_kenitra", fieldPwd, "Équipe Kénitra", "FIELD",
-                "Equipe Kénitra (N°01/26)");
     }
 
     private void seed(String username, String rawPwd, String fullName, String role, String team) {
