@@ -61,7 +61,7 @@ export function TopBar({
         <div style={{ width: 1, height: 34, background: T.border, flexShrink: 0 }} />
         <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: 22, fontWeight: 700, color: T.text, lineHeight: 1.1, letterSpacing: '-0.02em' }}>
-            Inventaire Forestier National 2026
+            Inventaire Forestier National 2026 · Statistiques
           </div>
           <div style={{ fontSize: 13, color: T.muted, marginTop: 3, fontWeight: 600, lineHeight: 1.3 }}>
             DRANEF Rabat-Salé-Kénitra{totalProgramme != null ? ` · ${totalProgramme} placettes programmées` : ''}
