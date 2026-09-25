@@ -11,7 +11,7 @@ import {
   type GlobalStats, type PlotFeature, type FormationRow,
 } from './services/api';
 
-/** The statistics dashboard's own page — mounted at /dashboard/statistic by the main
+/** The statistics dashboard's own page — mounted at /dashboard/statistics by the main
  *  app's router, which already guarantees a valid session before this renders (see
  *  ProtectedStatistics in App.tsx). No login screen of its own: it shares the main
  *  dashboard's JWT (see services/api.ts). */

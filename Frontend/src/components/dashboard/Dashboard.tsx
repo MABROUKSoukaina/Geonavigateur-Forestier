@@ -1872,7 +1872,7 @@ export function Dashboard({ onLogout }: Props) {
               </button>
             </>
           )}
-          <button onClick={() => navigate('/dashboard/statistic')} title="Statistiques"
+          <button onClick={() => navigate('/dashboard/statistics')} title="Statistiques"
             style={S.iconBtn}
             onMouseEnter={e => { e.currentTarget.style.color = '#10b981'; }}
             onMouseLeave={e => { e.currentTarget.style.color = '#94a3b8'; }}>

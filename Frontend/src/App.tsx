@@ -200,7 +200,7 @@ export default function App() {
     <Routes>
       <Route path="/" element={<ProtectedMap />} />
       <Route path="/dashboard" element={<ProtectedDashboard />} />
-      <Route path="/dashboard/statistic" element={<ProtectedStatistics />} />
+      <Route path="/dashboard/statistics" element={<ProtectedStatistics />} />
     </Routes>
   );
 }
