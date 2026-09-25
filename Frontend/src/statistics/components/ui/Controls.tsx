@@ -21,7 +21,7 @@ export function PlainSelect({ label, value, options, onChange, width = 120, inli
       style={{
         width: inline ? width : '100%', background: T.panelAlt, border: `1px solid ${T.border}`,
         borderRadius: 9, padding: '7px 8px', color: T.text, fontSize: 12.5,
-        fontFamily: 'inherit', outline: 'none', cursor: 'pointer',
+        fontFamily: 'inherit', outline: 'none', cursor: 'pointer', accentColor: T.green,
       }}
     >
       {options.map(o => <option key={o.value} value={o.value} style={{ background: T.raised }}>{o.label}</option>)}
