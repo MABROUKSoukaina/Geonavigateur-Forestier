@@ -113,7 +113,8 @@ public class PlotDetailController {
         List<Map<String, Object>> treeRows = jdbc.queryForList(treeSql, plotNo);
 
         String regenSql =
-            "SELECT ROUND((SUM(COALESCE(reg_nbre_sup_1_3,0) + COALESCE(reg_nbre_inf_1_3,0)) * (10000.0/2827.43))::numeric, 0) AS regeneration_ha " +
+            "SELECT SUM(COALESCE(reg_nbre_sup_1_3,0) + COALESCE(reg_nbre_inf_1_3,0)) AS regeneration_plot, " +
+            "  ROUND((SUM(COALESCE(reg_nbre_sup_1_3,0) + COALESCE(reg_nbre_inf_1_3,0)) * (10000.0/2827.43))::numeric, 0) AS regeneration_ha " +
             "FROM regeneration WHERE plot_plot_no = ?";
         List<Map<String, Object>> regenRows = jdbc.queryForList(regenSql, plotNo);
 
@@ -121,6 +122,7 @@ public class PlotDetailController {
         result.put("plotNo", plotNo);
         result.put("site", siteRows.isEmpty() ? Map.of() : siteRows.get(0));
         result.put("arbres", treeRows.isEmpty() ? Map.of() : treeRows.get(0));
+        result.put("regenerationPlot", regenRows.isEmpty() ? null : regenRows.get(0).get("regeneration_plot"));
         result.put("regenerationHa", regenRows.isEmpty() ? null : regenRows.get(0).get("regeneration_ha"));
         return ResponseEntity.ok(result);
     }

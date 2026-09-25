@@ -221,11 +221,11 @@ function FixedRow({ label, children }: { label: string; children: React.ReactNod
  *  aren't area-dependent, so they're identical in both sections by definition — that's not
  *  a bug, there's no "per plot" version of a mean height. Every row is a fixed part of this
  *  section's template, so it always shows (as "—" when unknown) rather than disappearing. */
-function DescriptionQuantitative({ p, site, arbres, regenerationHa }: {
+function DescriptionQuantitative({ p, site, arbres, regenerationPlot }: {
   p: PlotFeature['properties'];
   site: PlotDetail['site'];
   arbres: PlotDetail['arbres'];
-  regenerationHa: number | null;
+  regenerationPlot: number | null;
 }) {
   const liegeTotal = arbres.liege_demascles + arbres.liege_non_demascles;
   const liegePct = liegeTotal > 0 ? Math.round((arbres.liege_demascles / liegeTotal) * 100) : null;
@@ -235,7 +235,7 @@ function DescriptionQuantitative({ p, site, arbres, regenerationHa }: {
       <FixedRow label="Densité">{arbres.densite_plot != null ? `${fmt(arbres.densite_plot)} tiges` : null}</FixedRow>
       <FixedRow label="Surface terrière">{arbres.surface_terriere_plot != null ? `${fmt(arbres.surface_terriere_plot, 3)} m²` : null}</FixedRow>
       <FixedRow label="Volume">{arbres.volume_plot != null ? `${fmt(arbres.volume_plot, 3)} m³` : null}</FixedRow>
-      <FixedRow label="Régénération">{regenerationHa != null ? `${fmt(regenerationHa)} brins/ha` : null}</FixedRow>
+      <FixedRow label="Régénération">{regenerationPlot != null ? `${fmt(regenerationPlot)} brins` : null}</FixedRow>
       <FixedRow label="Arbres inventoriés">
         {`${fmt(p.nb_arbres_total)}${arbres.pct_sains != null ? ` (${fmt(arbres.pct_sains, 0)} % sains)` : ''}`}
       </FixedRow>
@@ -247,7 +247,6 @@ function DescriptionQuantitative({ p, site, arbres, regenerationHa }: {
       </FixedRow>
       <FixedRow label="Hauteur moyenne">{`${fmt(p.hauteur_moyenne, 1)} m`}</FixedRow>
       <FixedRow label="Circonférence 1,3 moyenne">{`${fmt(p.circonference_moyenne, 1)} cm`}</FixedRow>
-      <FixedRow label="Circonférence C 0,2 moyenne">{arbres.c0_moyenne != null ? `${fmt(arbres.c0_moyenne, 1)} cm` : null}</FixedRow>
     </div>
   );
 }
@@ -313,7 +312,7 @@ function PopupBody({ f, color, detail }: { f: PlotFeature; color: string; detail
             <div style={{ marginTop: 9, paddingTop: 8, borderTop: `1px solid ${T.border}` }}>
               <SectionCaption color={T.greenLite}>Description quantitative</SectionCaption>
               {loaded
-                ? <DescriptionQuantitative p={p} site={loaded.site} arbres={loaded.arbres} regenerationHa={loaded.regenerationHa} />
+                ? <DescriptionQuantitative p={p} site={loaded.site} arbres={loaded.arbres} regenerationPlot={loaded.regenerationPlot} />
                 : <DetailLoadState detail={detail as 'loading' | 'error' | undefined} />}
             </div>
 

@@ -208,6 +208,7 @@ export interface PlotDetail {
     liege_demascles: number;
     liege_non_demascles: number;
   };
+  regenerationPlot: number | null;
   regenerationHa: number | null;
 }
 
